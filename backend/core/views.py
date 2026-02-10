@@ -37,6 +37,18 @@ def resolve_weights(course):
     return classroom_weight, homework_weight
 
 
+def score_band(value):
+    if value is None:
+        return "pending"
+    if value >= 90:
+        return "excellent"
+    if value >= 80:
+        return "good"
+    if value >= 60:
+        return "pass"
+    return "fail"
+
+
 def enrollment_summary(enrollment):
     classroom_latest = (
         ClassroomScore.objects.filter(enrollment=enrollment)
@@ -114,6 +126,37 @@ class CourseViewSet(viewsets.ModelViewSet):
                 "course_average": course_average,
             }
         )
+
+    @action(detail=True, methods=["get"])
+    def report(self, request, pk=None):
+        course = self.get_object()
+        enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+        distribution = {
+            "excellent": 0,
+            "good": 0,
+            "pass": 0,
+            "fail": 0,
+            "pending": 0,
+        }
+        for row in rows:
+            distribution[score_band(row["total_score"])] += 1
+
+        ranked = [row for row in rows if row["total_score"] is not None]
+        ranked.sort(key=lambda item: item["total_score"], reverse=True)
+
+        return Response(
+            {
+                "course_id": course.id,
+                "course_code": course.code,
+                "course_name": course.name,
+                "distribution": distribution,
+                "top3": ranked[:3],
+                "pending_count": distribution["pending"],
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def leaderboard(self, request, pk=None):
         course = self.get_object()

@@ -47,6 +47,7 @@ npm run dev
 - `GET /api/courses/` 课程
 - `GET /api/courses/{id}/overview/` 课程总体统计（已评分人数、均分）
 - `GET /api/courses/{id}/leaderboard/` 课程排名汇总
+- `GET /api/courses/{id}/report/` 课程分数段报告（优秀/良好/及格/不及格/待评分）
 - `GET /api/enrollments/` 选课关系
 - `GET /api/enrollments/{id}/summary/` 单个学生在课程内的评分汇总
 - `GET /api/score-rules/` 评分规则
