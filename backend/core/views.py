@@ -1,3 +1,6 @@
+import csv
+
+from django.http import HttpResponse
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -254,6 +257,37 @@ class CourseViewSet(viewsets.ModelViewSet):
                 "pending_count": distribution["pending"],
             }
         )
+
+    @action(detail=True, methods=["get"])
+    def leaderboard_export(self, request, pk=None):
+        course = self.get_object()
+        enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows.sort(
+            key=lambda item: item["total_score"] if item["total_score"] is not None else -1,
+            reverse=True,
+        )
+
+        for index, row in enumerate(rows, start=1):
+            row["rank"] = index if row["total_score"] is not None else None
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = (
+            f'attachment; filename="{course.code}_leaderboard.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow(["rank", "student_number", "classroom_score", "homework_score", "total_score"])
+        for row in rows:
+            writer.writerow(
+                [
+                    row["rank"],
+                    row["student_number"],
+                    row["classroom_score"],
+                    row["homework_score"],
+                    row["total_score"],
+                ]
+            )
+        return response
 
     @action(detail=True, methods=["get"])
     def leaderboard(self, request, pk=None):
