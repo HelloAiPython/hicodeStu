@@ -71,6 +71,7 @@ npm run dev
 - `GET /api/score-rules/` 评分规则
 - `GET /api/score-rules/validate/?course_id=<id>` 校验课程权重总和是否为100
 - `POST /api/score-rules/normalize/` 归一化课程启用权重到100
+- `GET /api/score-rules/audit/` 审计全部课程权重配置
 - `GET /api/classroom-scores/` 课堂评分
 - `GET /api/homework-scores/` 作业评分
 

@@ -463,6 +463,34 @@ class ScoreRuleViewSet(viewsets.ModelViewSet):
             }
         )
 
+
+    @action(detail=False, methods=["get"], url_path="audit")
+    def audit_weights(self, request):
+        result = []
+        courses = Course.objects.all().order_by("id")
+        for course in courses:
+            rules = ScoreRule.objects.filter(course=course, is_active=True)
+            total_weight = round(sum(float(rule.weight) for rule in rules), 2)
+            result.append(
+                {
+                    "course_id": course.id,
+                    "course_code": course.code,
+                    "course_name": course.name,
+                    "active_rule_count": rules.count(),
+                    "total_weight": total_weight,
+                    "is_valid": total_weight == 100.0,
+                }
+            )
+
+        invalid_count = sum(1 for item in result if not item["is_valid"])
+        return Response(
+            {
+                "course_count": len(result),
+                "invalid_count": invalid_count,
+                "results": result,
+            }
+        )
+
     @action(detail=False, methods=["post"], url_path="normalize")
     def normalize_weights(self, request):
         course_id = request.data.get("course_id")
