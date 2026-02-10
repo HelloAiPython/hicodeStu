@@ -89,6 +89,40 @@ def enrollment_summary(enrollment):
     }
 
 
+
+
+def student_progress(profile):
+    enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
+    details = []
+    scores = []
+
+    for enrollment in enrollments:
+        summary = enrollment_summary(enrollment)
+        details.append(
+            {
+                "course_id": enrollment.course_id,
+                "course_code": enrollment.course.code,
+                "course_name": enrollment.course.name,
+                "total_score": summary["total_score"],
+                "has_classroom": summary["has_classroom"],
+                "has_homework": summary["has_homework"],
+            }
+        )
+        if summary["total_score"] is not None:
+            scores.append(summary["total_score"])
+
+    overall_average = round(sum(scores) / len(scores), 2) if scores else None
+    pending_count = len(details) - len(scores)
+
+    return {
+        "student_id": profile.id,
+        "student_number": profile.student_number,
+        "course_count": len(details),
+        "scored_course_count": len(scores),
+        "pending_course_count": pending_count,
+        "overall_average": overall_average,
+        "courses": details,
+    }
 class IsTeacher(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:
         return request.user and request.user.is_authenticated and request.user.is_staff
@@ -98,6 +132,11 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
     queryset = StudentProfile.objects.all()
     serializer_class = StudentProfileSerializer
     permission_classes = [IsTeacher]
+
+    @action(detail=True, methods=["get"])
+    def progress(self, request, pk=None):
+        profile = self.get_object()
+        return Response(student_progress(profile))
 
 
 class CourseViewSet(viewsets.ModelViewSet):

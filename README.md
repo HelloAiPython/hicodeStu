@@ -44,6 +44,7 @@ npm run dev
 
 ### 已暴露的 API 资源（示例）
 - `GET /api/students/` 学生档案
+- `GET /api/students/{id}/progress/` 学生跨课程学习进度
 - `GET /api/courses/` 课程
 - `GET /api/courses/{id}/overview/` 课程总体统计（已评分人数、均分）
 - `GET /api/courses/{id}/leaderboard/` 课程排名汇总
