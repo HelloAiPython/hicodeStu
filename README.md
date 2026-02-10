@@ -46,6 +46,7 @@ npm run dev
 - `GET /api/students/` 学生档案
 - `GET /api/courses/` 课程
 - `GET /api/enrollments/` 选课关系
+- `GET /api/enrollments/{id}/summary/` 单个学生在课程内的评分汇总
 - `GET /api/score-rules/` 评分规则
 - `GET /api/classroom-scores/` 课堂评分
 - `GET /api/homework-scores/` 作业评分
