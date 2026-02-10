@@ -134,6 +134,15 @@ def parse_optional_float(raw_value):
         return None
 
 
+def parse_positive_int(raw_value, default):
+    if raw_value is None or raw_value == "":
+        return default
+    if not str(raw_value).isdigit():
+        return default
+    value = int(raw_value)
+    return value if value > 0 else default
+
+
 class IsTeacher(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:
         return request.user and request.user.is_authenticated and request.user.is_staff
@@ -216,6 +225,8 @@ class CourseViewSet(viewsets.ModelViewSet):
         student_number = request.query_params.get("student_number")
         min_score = parse_optional_float(request.query_params.get("min_score"))
         limit = request.query_params.get("limit")
+        page = parse_positive_int(request.query_params.get("page"), 1)
+        page_size = parse_positive_int(request.query_params.get("page_size"), 20)
 
         if only_scored:
             rows = [row for row in rows if row["total_score"] is not None]
@@ -239,19 +250,26 @@ class CourseViewSet(viewsets.ModelViewSet):
         if limit and limit.isdigit():
             rows = rows[: int(limit)]
 
+        total = len(rows)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paged_rows = rows[start:end]
+
         return Response(
             {
                 "course_id": course.id,
                 "course_code": course.code,
                 "course_name": course.name,
-                "count": len(rows),
+                "count": total,
+                "page": page,
+                "page_size": page_size,
                 "filters": {
                     "only_scored": only_scored,
                     "student_number": student_number,
                     "min_score": min_score,
                     "limit": int(limit) if limit and limit.isdigit() else None,
                 },
-                "results": rows,
+                "results": paged_rows,
             }
         )
 

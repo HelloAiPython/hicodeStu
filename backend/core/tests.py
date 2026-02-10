@@ -67,6 +67,18 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["results"][0]["student_number"], "S001")
 
+
+    def test_leaderboard_pagination(self):
+        response = self.client.get(
+            f"/api/courses/{self.course.id}/leaderboard/?only_scored=1&page=1&page_size=1"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 2)
+        self.assertEqual(data["page"], 1)
+        self.assertEqual(data["page_size"], 1)
+        self.assertEqual(len(data["results"]), 1)
+
     def test_leaderboard_student_number_and_limit(self):
         response = self.client.get(
             f"/api/courses/{self.course.id}/leaderboard/?student_number=S00&limit=1"
