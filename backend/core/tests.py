@@ -7,11 +7,11 @@ from rest_framework.test import APIClient
 from core.models import ClassroomScore, Course, Enrollment, HomeworkScore, ScoreRule, StudentProfile
 
 
-class LeaderboardApiTests(TestCase):
+class BaseApiFixture(TestCase):
     def setUp(self):
         self.client = APIClient()
-        User = get_user_model()
-        self.teacher = User.objects.create_user(
+        user_model = get_user_model()
+        self.teacher = user_model.objects.create_user(
             username="teacher", password="pass123456", is_staff=True
         )
         self.client.force_authenticate(user=self.teacher)
@@ -22,7 +22,7 @@ class LeaderboardApiTests(TestCase):
 
         self.students = []
         for index in range(1, 4):
-            user = User.objects.create_user(username=f"stu{index}", password="pass123456")
+            user = user_model.objects.create_user(username=f"stu{index}", password="pass123456")
             profile = StudentProfile.objects.create(
                 user=user,
                 student_number=f"S00{index}",
@@ -32,7 +32,6 @@ class LeaderboardApiTests(TestCase):
             enrollment = Enrollment.objects.create(student=profile, course=self.course)
             self.students.append((profile, enrollment))
 
-        # S001 total -> 92
         ClassroomScore.objects.create(
             enrollment=self.students[0][1],
             attentive=95,
@@ -43,7 +42,6 @@ class LeaderboardApiTests(TestCase):
             enrollment=self.students[0][1], completion=93, accuracy=92, correction=91
         )
 
-        # S002 total -> 75
         ClassroomScore.objects.create(
             enrollment=self.students[1][1], attentive=75, participation=74, exercise_completion=76
         )
@@ -51,8 +49,8 @@ class LeaderboardApiTests(TestCase):
             enrollment=self.students[1][1], completion=74, accuracy=76, correction=75
         )
 
-        # S003 pending (no scores)
 
+class LeaderboardApiTests(BaseApiFixture):
     def test_leaderboard_default(self):
         response = self.client.get(f"/api/courses/{self.course.id}/leaderboard/")
         self.assertEqual(response.status_code, 200)
@@ -77,3 +75,24 @@ class LeaderboardApiTests(TestCase):
         data = response.json()
         self.assertEqual(data["count"], 1)
         self.assertEqual(len(data["results"]), 1)
+
+
+class ReportAndProgressApiTests(BaseApiFixture):
+    def test_course_report_distribution(self):
+        response = self.client.get(f"/api/courses/{self.course.id}/report/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["distribution"]["excellent"], 1)
+        self.assertEqual(data["distribution"]["pass"], 1)
+        self.assertEqual(data["distribution"]["pending"], 1)
+        self.assertEqual(len(data["top3"]), 2)
+
+    def test_student_progress_payload(self):
+        student_profile = self.students[0][0]
+        response = self.client.get(f"/api/students/{student_profile.id}/progress/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["student_number"], "S001")
+        self.assertEqual(data["course_count"], 1)
+        self.assertEqual(data["scored_course_count"], 1)
+        self.assertIsNotNone(data["overall_average"])
