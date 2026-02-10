@@ -124,6 +124,24 @@ class LeaderboardApiTests(BaseApiFixture):
         response = self.client.get("/api/score-rules/validate/")
         self.assertEqual(response.status_code, 400)
 
+    def test_score_rule_normalize_weights(self):
+        ScoreRule.objects.filter(course=self.course, name="classroom").update(weight=Decimal("70.00"))
+        ScoreRule.objects.filter(course=self.course, name="homework").update(weight=Decimal("50.00"))
+
+        response = self.client.post(
+            "/api/score-rules/normalize/",
+            {"course_id": self.course.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["total_weight"], 100.0)
+        self.assertTrue(data["is_valid"])
+
+    def test_score_rule_normalize_weights_missing_course_id(self):
+        response = self.client.post("/api/score-rules/normalize/", {}, format="json")
+        self.assertEqual(response.status_code, 400)
+
 class ReportAndProgressApiTests(BaseApiFixture):
     def test_course_report_distribution(self):
         response = self.client.get(f"/api/courses/{self.course.id}/report/")

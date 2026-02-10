@@ -462,3 +462,42 @@ class ScoreRuleViewSet(viewsets.ModelViewSet):
                 "is_valid": total_weight == 100.0,
             }
         )
+
+    @action(detail=False, methods=["post"], url_path="normalize")
+    def normalize_weights(self, request):
+        course_id = request.data.get("course_id")
+        if not course_id or not str(course_id).isdigit():
+            return Response({"detail": "请提供 course_id。"}, status=400)
+
+        rules = list(ScoreRule.objects.filter(course_id=int(course_id), is_active=True).order_by("id"))
+        if not rules:
+            return Response({"detail": "没有可归一化的启用规则。"}, status=400)
+
+        current_total = sum(float(rule.weight) for rule in rules)
+        if current_total <= 0:
+            equal_weight = round(100.0 / len(rules), 2)
+            for rule in rules:
+                rule.weight = equal_weight
+                rule.save(update_fields=["weight"])
+        else:
+            scaled = []
+            for rule in rules:
+                value = round(float(rule.weight) * 100.0 / current_total, 2)
+                scaled.append(value)
+
+            diff = round(100.0 - sum(scaled), 2)
+            scaled[-1] = round(scaled[-1] + diff, 2)
+
+            for rule, value in zip(rules, scaled):
+                rule.weight = value
+                rule.save(update_fields=["weight"])
+
+        total_weight = round(sum(float(rule.weight) for rule in rules), 2)
+        return Response(
+            {
+                "course_id": int(course_id),
+                "active_rule_count": len(rules),
+                "total_weight": total_weight,
+                "is_valid": total_weight == 100.0,
+            }
+        )
