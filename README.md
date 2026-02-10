@@ -14,6 +14,19 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+### 首次初始化（避免 no such table 错误）
+
+```bash
+python manage.py makemigrations core
+python manage.py migrate
+```
+
+### 初始化演示课程与评分规则
+
+```bash
+python manage.py init_demo_data --teacher <教师用户名> --course-code C001 --course-name "示例课程"
+```
+
 ### JWT 登录
 
 ```bash
