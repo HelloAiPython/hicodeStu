@@ -445,3 +445,20 @@ class ScoreRuleViewSet(viewsets.ModelViewSet):
     queryset = ScoreRule.objects.select_related("course")
     serializer_class = ScoreRuleSerializer
     permission_classes = [IsTeacher]
+
+    @action(detail=False, methods=["get"], url_path="validate")
+    def validate_weights(self, request):
+        course_id = request.query_params.get("course_id")
+        if not course_id or not course_id.isdigit():
+            return Response({"detail": "请提供 course_id。"}, status=400)
+
+        rules = ScoreRule.objects.filter(course_id=int(course_id), is_active=True)
+        total_weight = round(sum(float(rule.weight) for rule in rules), 2)
+        return Response(
+            {
+                "course_id": int(course_id),
+                "active_rule_count": rules.count(),
+                "total_weight": total_weight,
+                "is_valid": total_weight == 100.0,
+            }
+        )

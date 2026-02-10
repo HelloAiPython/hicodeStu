@@ -112,6 +112,18 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["fully_scored_enrollment_count"], 2)
         self.assertEqual(data["pending_enrollment_count"], 1)
 
+
+    def test_score_rule_validate_weights(self):
+        response = self.client.get(f"/api/score-rules/validate/?course_id={self.course.id}")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["total_weight"], 100.0)
+        self.assertTrue(data["is_valid"])
+
+    def test_score_rule_validate_weights_missing_course_id(self):
+        response = self.client.get("/api/score-rules/validate/")
+        self.assertEqual(response.status_code, 400)
+
 class ReportAndProgressApiTests(BaseApiFixture):
     def test_course_report_distribution(self):
         response = self.client.get(f"/api/courses/{self.course.id}/report/")

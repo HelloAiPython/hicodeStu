@@ -69,6 +69,7 @@ npm run dev
 - `GET /api/enrollments/{id}/summary/` 单个学生在课程内的评分汇总
 - `GET /api/enrollments/{id}/history/` 单个学生在课程内的评分历史轨迹
 - `GET /api/score-rules/` 评分规则
+- `GET /api/score-rules/validate/?course_id=<id>` 校验课程权重总和是否为100
 - `GET /api/classroom-scores/` 课堂评分
 - `GET /api/homework-scores/` 作业评分
 
