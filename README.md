@@ -67,3 +67,16 @@ npm run dev
 - `GET /api/score-rules/` 评分规则
 - `GET /api/classroom-scores/` 课堂评分
 - `GET /api/homework-scores/` 作业评分
+
+
+### 排名接口过滤参数（leaderboard）
+- `only_scored=1`：只返回已有总分学生
+- `student_number=<学号片段>`：按学号筛选
+- `min_score=<数字>`：按最低总分筛选
+- `limit=<数字>`：限制返回条数
+
+示例：
+```bash
+curl "http://127.0.0.1:8000/api/courses/1/leaderboard/?only_scored=1&min_score=80&limit=10" \
+  -H "Authorization: Bearer <你的access_token>"
+```

@@ -56,7 +56,9 @@ def enrollment_summary(enrollment):
         .first()
     )
     homework_latest = (
-        HomeworkScore.objects.filter(enrollment=enrollment).order_by("-recorded_at", "-id").first()
+        HomeworkScore.objects.filter(enrollment=enrollment)
+        .order_by("-recorded_at", "-id")
+        .first()
     )
 
     classroom_score = average_score(
@@ -87,8 +89,6 @@ def enrollment_summary(enrollment):
         "has_classroom": classroom_latest is not None,
         "has_homework": homework_latest is not None,
     }
-
-
 
 
 def student_progress(profile):
@@ -123,6 +123,17 @@ def student_progress(profile):
         "overall_average": overall_average,
         "courses": details,
     }
+
+
+def parse_optional_float(raw_value):
+    if raw_value is None or raw_value == "":
+        return None
+    try:
+        return float(raw_value)
+    except ValueError:
+        return None
+
+
 class IsTeacher(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:
         return request.user and request.user.is_authenticated and request.user.is_staff
@@ -143,7 +154,6 @@ class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [IsTeacher]
-
 
     @action(detail=True, methods=["get"])
     def overview(self, request, pk=None):
@@ -201,10 +211,33 @@ class CourseViewSet(viewsets.ModelViewSet):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
         rows = [enrollment_summary(enrollment) for enrollment in enrollments]
-        rows.sort(key=lambda item: item["total_score"] if item["total_score"] is not None else -1, reverse=True)
+
+        only_scored = request.query_params.get("only_scored") == "1"
+        student_number = request.query_params.get("student_number")
+        min_score = parse_optional_float(request.query_params.get("min_score"))
+        limit = request.query_params.get("limit")
+
+        if only_scored:
+            rows = [row for row in rows if row["total_score"] is not None]
+        if student_number:
+            rows = [row for row in rows if student_number in row["student_number"]]
+        if min_score is not None:
+            rows = [
+                row
+                for row in rows
+                if row["total_score"] is not None and row["total_score"] >= min_score
+            ]
+
+        rows.sort(
+            key=lambda item: item["total_score"] if item["total_score"] is not None else -1,
+            reverse=True,
+        )
 
         for index, row in enumerate(rows, start=1):
             row["rank"] = index if row["total_score"] is not None else None
+
+        if limit and limit.isdigit():
+            rows = rows[: int(limit)]
 
         return Response(
             {
@@ -212,6 +245,12 @@ class CourseViewSet(viewsets.ModelViewSet):
                 "course_code": course.code,
                 "course_name": course.name,
                 "count": len(rows),
+                "filters": {
+                    "only_scored": only_scored,
+                    "student_number": student_number,
+                    "min_score": min_score,
+                    "limit": int(limit) if limit and limit.isdigit() else None,
+                },
                 "results": rows,
             }
         )
