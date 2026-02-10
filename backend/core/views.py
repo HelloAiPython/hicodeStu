@@ -259,6 +259,44 @@ class CourseViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["get"])
+    def report_export(self, request, pk=None):
+        course = self.get_object()
+        enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows.sort(
+            key=lambda item: item["total_score"] if item["total_score"] is not None else -1,
+            reverse=True,
+        )
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{course.code}_report.csv"'
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "student_number",
+                "classroom_score",
+                "homework_score",
+                "total_score",
+                "band",
+                "has_classroom",
+                "has_homework",
+            ]
+        )
+        for row in rows:
+            writer.writerow(
+                [
+                    row["student_number"],
+                    row["classroom_score"],
+                    row["homework_score"],
+                    row["total_score"],
+                    score_band(row["total_score"]),
+                    row["has_classroom"],
+                    row["has_homework"],
+                ]
+            )
+        return response
+
+    @action(detail=True, methods=["get"])
     def leaderboard_export(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)

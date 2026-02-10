@@ -96,6 +96,12 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertIn("text/csv", response["Content-Type"])
         self.assertIn("attachment; filename=", response["Content-Disposition"])
 
+    def test_report_export_csv(self):
+        response = self.client.get(f"/api/courses/{self.course.id}/report_export/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response["Content-Type"])
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
+
 class ReportAndProgressApiTests(BaseApiFixture):
     def test_course_report_distribution(self):
         response = self.client.get(f"/api/courses/{self.course.id}/report/")
