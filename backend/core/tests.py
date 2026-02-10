@@ -159,6 +159,28 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["invalid_count"], 1)
         self.assertFalse(data["results"][0]["is_valid"])
 
+    def test_enrollment_bulk_create(self):
+        extra_user = get_user_model().objects.create_user(username="stu_extra", password="pass123456")
+        extra_profile = StudentProfile.objects.create(
+            user=extra_user,
+            student_number="S999",
+            enrollment_year=2024,
+            major="CS",
+        )
+        response = self.client.post(
+            "/api/enrollments/bulk_create/",
+            {"course_id": self.course.id, "student_ids": [extra_profile.id, 99999]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["created_count"], 1)
+        self.assertEqual(data["missing_student_ids"], [99999])
+
+    def test_enrollment_bulk_create_bad_request(self):
+        response = self.client.post("/api/enrollments/bulk_create/", {}, format="json")
+        self.assertEqual(response.status_code, 400)
+
 class ReportAndProgressApiTests(BaseApiFixture):
     def test_course_report_distribution(self):
         response = self.client.get(f"/api/courses/{self.course.id}/report/")

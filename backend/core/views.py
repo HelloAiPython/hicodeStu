@@ -418,6 +418,42 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     serializer_class = EnrollmentSerializer
     permission_classes = [IsTeacher]
 
+    @action(detail=False, methods=["post"], url_path="bulk_create")
+    def bulk_create(self, request):
+        course_id = request.data.get("course_id")
+        student_ids = request.data.get("student_ids", [])
+
+        if not course_id or not str(course_id).isdigit():
+            return Response({"detail": "请提供有效的 course_id。"}, status=400)
+        if not isinstance(student_ids, list) or not student_ids:
+            return Response({"detail": "student_ids 必须是非空数组。"}, status=400)
+
+        valid_students = StudentProfile.objects.filter(id__in=student_ids)
+        valid_student_ids = set(valid_students.values_list("id", flat=True))
+        missing_student_ids = [sid for sid in student_ids if sid not in valid_student_ids]
+
+        created = 0
+        existed = 0
+        for student in valid_students:
+            _, is_created = Enrollment.objects.get_or_create(
+                course_id=int(course_id),
+                student=student,
+            )
+            if is_created:
+                created += 1
+            else:
+                existed += 1
+
+        return Response(
+            {
+                "course_id": int(course_id),
+                "requested_count": len(student_ids),
+                "created_count": created,
+                "existed_count": existed,
+                "missing_student_ids": missing_student_ids,
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def summary(self, request, pk=None):
         enrollment = self.get_object()
