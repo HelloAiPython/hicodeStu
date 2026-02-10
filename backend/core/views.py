@@ -125,6 +125,46 @@ def student_progress(profile):
     }
 
 
+
+
+def enrollment_history(enrollment):
+    classroom_items = list(
+        ClassroomScore.objects.filter(enrollment=enrollment)
+        .order_by("recorded_at", "id")
+        .values("recorded_at", "attentive", "participation", "exercise_completion")
+    )
+    homework_items = list(
+        HomeworkScore.objects.filter(enrollment=enrollment)
+        .order_by("recorded_at", "id")
+        .values("recorded_at", "completion", "accuracy", "correction")
+    )
+
+    classroom_avg = [
+        {
+            "recorded_at": str(item["recorded_at"]),
+            "score": round(
+                (item["attentive"] + item["participation"] + item["exercise_completion"]) / 3,
+                2,
+            ),
+        }
+        for item in classroom_items
+    ]
+    homework_avg = [
+        {
+            "recorded_at": str(item["recorded_at"]),
+            "score": round((item["completion"] + item["accuracy"] + item["correction"]) / 3, 2),
+        }
+        for item in homework_items
+    ]
+
+    return {
+        "enrollment_id": enrollment.id,
+        "student_number": enrollment.student.student_number,
+        "course_code": enrollment.course.code,
+        "classroom_history": classroom_avg,
+        "homework_history": homework_avg,
+    }
+
 def parse_optional_float(raw_value):
     if raw_value is None or raw_value == "":
         return None
@@ -283,6 +323,11 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     def summary(self, request, pk=None):
         enrollment = self.get_object()
         return Response(enrollment_summary(enrollment))
+
+    @action(detail=True, methods=["get"])
+    def history(self, request, pk=None):
+        enrollment = self.get_object()
+        return Response(enrollment_history(enrollment))
 
 
 class ClassroomScoreViewSet(viewsets.ModelViewSet):
