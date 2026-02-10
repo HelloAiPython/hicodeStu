@@ -93,6 +93,27 @@ class CourseViewSet(viewsets.ModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [IsTeacher]
 
+
+    @action(detail=True, methods=["get"])
+    def overview(self, request, pk=None):
+        course = self.get_object()
+        enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+        summaries = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+        with_total = [item["total_score"] for item in summaries if item["total_score"] is not None]
+        course_average = round(sum(with_total) / len(with_total), 2) if with_total else None
+
+        return Response(
+            {
+                "course_id": course.id,
+                "course_code": course.code,
+                "course_name": course.name,
+                "student_count": len(summaries),
+                "scored_count": len(with_total),
+                "pending_count": len(summaries) - len(with_total),
+                "course_average": course_average,
+            }
+        )
     @action(detail=True, methods=["get"])
     def leaderboard(self, request, pk=None):
         course = self.get_object()
