@@ -102,6 +102,28 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertIn("text/csv", response["Content-Type"])
         self.assertIn("attachment; filename=", response["Content-Disposition"])
 
+    def test_course_compare(self):
+        extra_course = Course.objects.create(code="C002", name="英语", teacher=self.teacher)
+        ScoreRule.objects.create(course=extra_course, name="classroom", weight=Decimal("50.00"))
+        ScoreRule.objects.create(course=extra_course, name="homework", weight=Decimal("50.00"))
+
+        profile = self.students[0][0]
+        enrollment = Enrollment.objects.create(student=profile, course=extra_course)
+        ClassroomScore.objects.create(enrollment=enrollment, attentive=80, participation=80, exercise_completion=80)
+        HomeworkScore.objects.create(enrollment=enrollment, completion=80, accuracy=80, correction=80)
+
+        response = self.client.get(
+            f"/api/courses/compare/?course_ids={self.course.id}&course_ids={extra_course.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 2)
+        self.assertIn("average_score", data["results"][0])
+
+    def test_course_compare_missing_ids(self):
+        response = self.client.get("/api/courses/compare/")
+        self.assertEqual(response.status_code, 400)
+
     def test_course_global_overview(self):
         response = self.client.get("/api/courses/global_overview/")
         self.assertEqual(response.status_code, 200)

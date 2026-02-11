@@ -262,6 +262,38 @@ class CourseViewSet(viewsets.ModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [IsTeacher]
 
+
+    @action(detail=False, methods=["get"], url_path="compare")
+    def compare(self, request):
+        course_ids = request.query_params.getlist("course_ids")
+        valid_ids = [int(cid) for cid in course_ids if str(cid).isdigit()]
+        if not valid_ids:
+            return Response({"detail": "请提供 course_ids 参数。"}, status=400)
+
+        courses = Course.objects.filter(id__in=valid_ids)
+        results = []
+        for course in courses:
+            enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+            rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+            scored = [row["total_score"] for row in rows if row["total_score"] is not None]
+            avg = round(sum(scored) / len(scored), 2) if scored else None
+            results.append(
+                {
+                    "course_id": course.id,
+                    "course_code": course.code,
+                    "course_name": course.name,
+                    "student_count": len(rows),
+                    "scored_count": len(scored),
+                    "average_score": avg,
+                }
+            )
+
+        results.sort(
+            key=lambda item: item["average_score"] if item["average_score"] is not None else -1,
+            reverse=True,
+        )
+        return Response({"count": len(results), "results": results})
+
     @action(detail=False, methods=["get"])
     def global_overview(self, request):
         courses = Course.objects.count()

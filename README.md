@@ -62,6 +62,7 @@ npm run dev
 - `GET /api/students/{id}/progress_export/` 导出学生学习进度 CSV
 - `GET /api/courses/` 课程
 - `GET /api/courses/global_overview/` 全局统计总览
+- `GET /api/courses/compare/?course_ids=<id>&course_ids=<id>` 多课程横向对比
 - `GET /api/courses/{id}/overview/` 课程总体统计（已评分人数、均分）
 - `GET /api/courses/{id}/leaderboard/` 课程排名汇总
 - `GET /api/courses/{id}/leaderboard_export/` 导出课程排名 CSV
