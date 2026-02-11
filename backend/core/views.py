@@ -220,6 +220,50 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             }
         )
 
+
+    @action(detail=True, methods=["get"])
+    def alerts(self, request, pk=None):
+        profile = self.get_object()
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+        pending_courses = [
+            {
+                "course_id": enrollment.course_id,
+                "course_code": enrollment.course.code,
+                "course_name": enrollment.course.name,
+            }
+            for enrollment, row in zip(enrollments, rows)
+            if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
+        ]
+        risk_courses = [
+            {
+                "course_id": enrollment.course_id,
+                "course_code": enrollment.course.code,
+                "course_name": enrollment.course.name,
+                "total_score": row["total_score"],
+            }
+            for enrollment, row in zip(enrollments, rows)
+            if row["total_score"] is not None and row["total_score"] < threshold
+        ]
+        risk_courses.sort(key=lambda item: item["total_score"])
+
+        return Response(
+            {
+                "student_id": profile.id,
+                "student_number": profile.student_number,
+                "threshold": threshold,
+                "pending_count": len(pending_courses),
+                "risk_count": len(risk_courses),
+                "pending_courses": pending_courses,
+                "risk_courses": risk_courses,
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
         profile = self.get_object()

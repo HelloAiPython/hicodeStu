@@ -59,6 +59,7 @@ npm run dev
 - `GET /api/students/` 学生档案
 - `GET /api/students/search/?q=<关键字>` 按学号搜索学生
 - `GET /api/students/{id}/progress/` 学生跨课程学习进度
+- `GET /api/students/{id}/alerts/?threshold=<分数>` 学生预警信息
 - `GET /api/students/{id}/progress_export/` 导出学生学习进度 CSV
 - `GET /api/courses/` 课程
 - `GET /api/courses/global_overview/` 全局统计总览
