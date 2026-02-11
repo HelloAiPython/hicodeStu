@@ -310,6 +310,43 @@ class CourseViewSet(viewsets.ModelViewSet):
         )
 
 
+
+    @action(detail=True, methods=["get"])
+    def action_board(self, request, pk=None):
+        course = self.get_object()
+        enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+        limit = parse_positive_int(request.query_params.get("limit"), 10)
+
+        pending_rows = [
+            row
+            for row in rows
+            if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
+        ]
+        risk_rows = [
+            row
+            for row in rows
+            if row["total_score"] is not None and row["total_score"] < threshold
+        ]
+        risk_rows.sort(key=lambda item: item["total_score"])
+
+        return Response(
+            {
+                "course_id": course.id,
+                "course_code": course.code,
+                "course_name": course.name,
+                "threshold": threshold,
+                "pending_count": len(pending_rows),
+                "risk_count": len(risk_rows),
+                "pending_examples": pending_rows[:limit],
+                "risk_examples": risk_rows[:limit],
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def risk_list(self, request, pk=None):
         course = self.get_object()
