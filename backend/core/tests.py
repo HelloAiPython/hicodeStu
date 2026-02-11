@@ -181,6 +181,20 @@ class LeaderboardApiTests(BaseApiFixture):
         response = self.client.post("/api/enrollments/bulk_create/", {}, format="json")
         self.assertEqual(response.status_code, 400)
 
+    def test_student_search(self):
+        response = self.client.get("/api/students/search/?q=S00")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 3)
+        self.assertEqual(len(data["results"]), 3)
+
+    def test_student_search_no_match(self):
+        response = self.client.get("/api/students/search/?q=NOT_FOUND")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(len(data["results"]), 0)
+
 class ReportAndProgressApiTests(BaseApiFixture):
     def test_course_report_distribution(self):
         response = self.client.get(f"/api/courses/{self.course.id}/report/")

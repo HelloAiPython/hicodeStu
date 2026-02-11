@@ -196,6 +196,30 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
     serializer_class = StudentProfileSerializer
     permission_classes = [IsTeacher]
 
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        keyword = (request.query_params.get("q") or "").strip()
+        queryset = self.get_queryset()
+        if keyword:
+            queryset = queryset.filter(student_number__icontains=keyword)
+
+        queryset = queryset.select_related("user")[:50]
+        return Response(
+            {
+                "count": queryset.count(),
+                "results": [
+                    {
+                        "id": item.id,
+                        "student_number": item.student_number,
+                        "major": item.major,
+                        "enrollment_year": item.enrollment_year,
+                        "username": item.user.username,
+                    }
+                    for item in queryset
+                ],
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
         profile = self.get_object()
