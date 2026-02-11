@@ -226,6 +226,37 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         return Response(student_progress(profile))
 
 
+    @action(detail=True, methods=["get"])
+    def progress_export(self, request, pk=None):
+        profile = self.get_object()
+        payload = student_progress(profile)
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = (
+            f'attachment; filename="{profile.student_number}_progress.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow([
+            "course_code",
+            "course_name",
+            "total_score",
+            "has_classroom",
+            "has_homework",
+        ])
+        for row in payload["courses"]:
+            writer.writerow(
+                [
+                    row["course_code"],
+                    row["course_name"],
+                    row["total_score"],
+                    row["has_classroom"],
+                    row["has_homework"],
+                ]
+            )
+
+        return response
+
+
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer

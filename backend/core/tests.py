@@ -269,6 +269,13 @@ class ReportAndProgressApiTests(BaseApiFixture):
         self.assertEqual(data["distribution"]["pending"], 1)
         self.assertEqual(len(data["top3"]), 2)
 
+    def test_student_progress_export_csv(self):
+        student_profile = self.students[0][0]
+        response = self.client.get(f"/api/students/{student_profile.id}/progress_export/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response["Content-Type"])
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
+
     def test_student_progress_payload(self):
         student_profile = self.students[0][0]
         response = self.client.get(f"/api/students/{student_profile.id}/progress/")
