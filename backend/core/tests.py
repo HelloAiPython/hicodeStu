@@ -195,6 +195,45 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["count"], 0)
         self.assertEqual(len(data["results"]), 0)
 
+    def test_classroom_score_bulk_create(self):
+        enrollment = self.students[2][1]
+        response = self.client.post(
+            "/api/classroom-scores/bulk_create/",
+            {
+                "records": [
+                    {
+                        "enrollment": enrollment.id,
+                        "attentive": 88,
+                        "participation": 86,
+                        "exercise_completion": 90,
+                    },
+                    {"attentive": 10},
+                ]
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["created_count"], 1)
+        self.assertEqual(data["skipped_count"], 1)
+
+    def test_homework_score_bulk_create(self):
+        enrollment = self.students[2][1]
+        response = self.client.post(
+            "/api/homework-scores/bulk_create/",
+            {
+                "records": [
+                    {"enrollment": enrollment.id, "completion": 87, "accuracy": 85, "correction": 90},
+                    {"accuracy": 10},
+                ]
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["created_count"], 1)
+        self.assertEqual(data["skipped_count"], 1)
+
 class ReportAndProgressApiTests(BaseApiFixture):
     def test_course_report_distribution(self):
         response = self.client.get(f"/api/courses/{self.course.id}/report/")

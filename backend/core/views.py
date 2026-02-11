@@ -494,11 +494,59 @@ class ClassroomScoreViewSet(viewsets.ModelViewSet):
     serializer_class = ClassroomScoreSerializer
     permission_classes = [IsTeacher]
 
+    @action(detail=False, methods=["post"], url_path="bulk_create")
+    def bulk_create(self, request):
+        records = request.data.get("records", [])
+        if not isinstance(records, list) or not records:
+            return Response({"detail": "records 必须是非空数组。"}, status=400)
+
+        created = 0
+        skipped = 0
+        for item in records:
+            enrollment_id = item.get("enrollment")
+            if not enrollment_id:
+                skipped += 1
+                continue
+            ClassroomScore.objects.create(
+                enrollment_id=enrollment_id,
+                attentive=item.get("attentive", 0),
+                participation=item.get("participation", 0),
+                exercise_completion=item.get("exercise_completion", 0),
+                note=item.get("note", ""),
+            )
+            created += 1
+
+        return Response({"created_count": created, "skipped_count": skipped})
+
 
 class HomeworkScoreViewSet(viewsets.ModelViewSet):
     queryset = HomeworkScore.objects.select_related("enrollment")
     serializer_class = HomeworkScoreSerializer
     permission_classes = [IsTeacher]
+
+    @action(detail=False, methods=["post"], url_path="bulk_create")
+    def bulk_create(self, request):
+        records = request.data.get("records", [])
+        if not isinstance(records, list) or not records:
+            return Response({"detail": "records 必须是非空数组。"}, status=400)
+
+        created = 0
+        skipped = 0
+        for item in records:
+            enrollment_id = item.get("enrollment")
+            if not enrollment_id:
+                skipped += 1
+                continue
+            HomeworkScore.objects.create(
+                enrollment_id=enrollment_id,
+                completion=item.get("completion", 0),
+                accuracy=item.get("accuracy", 0),
+                correction=item.get("correction", 0),
+                note=item.get("note", ""),
+            )
+            created += 1
+
+        return Response({"created_count": created, "skipped_count": skipped})
 
 
 class ScoreRuleViewSet(viewsets.ModelViewSet):

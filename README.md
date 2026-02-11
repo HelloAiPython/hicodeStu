@@ -75,7 +75,9 @@ npm run dev
 - `POST /api/score-rules/normalize/` 归一化课程启用权重到100
 - `GET /api/score-rules/audit/` 审计全部课程权重配置
 - `GET /api/classroom-scores/` 课堂评分
+- `POST /api/classroom-scores/bulk_create/` 批量录入课堂评分
 - `GET /api/homework-scores/` 作业评分
+- `POST /api/homework-scores/bulk_create/` 批量录入作业评分
 
 
 ### 排名接口过滤参数（leaderboard）
