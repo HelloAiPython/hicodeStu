@@ -234,6 +234,14 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["created_count"], 1)
         self.assertEqual(data["skipped_count"], 1)
 
+    def test_course_pending_list(self):
+        response = self.client.get(f"/api/courses/{self.course.id}/pending_list/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["student_number"], "S003")
+
 class ReportAndProgressApiTests(BaseApiFixture):
     def test_course_report_distribution(self):
         response = self.client.get(f"/api/courses/{self.course.id}/report/")

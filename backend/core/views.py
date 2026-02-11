@@ -310,6 +310,37 @@ class CourseViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["get"])
+    def pending_list(self, request, pk=None):
+        course = self.get_object()
+        enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+        pending_rows = [
+            row
+            for row in rows
+            if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
+        ]
+
+        page = parse_positive_int(request.query_params.get("page"), 1)
+        page_size = parse_positive_int(request.query_params.get("page_size"), 20)
+        total = len(pending_rows)
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        return Response(
+            {
+                "course_id": course.id,
+                "course_code": course.code,
+                "course_name": course.name,
+                "count": total,
+                "page": page,
+                "page_size": page_size,
+                "results": pending_rows[start:end],
+            }
+        )
+
+
+    @action(detail=True, methods=["get"])
     def report_export(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)

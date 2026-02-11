@@ -66,6 +66,7 @@ npm run dev
 - `GET /api/courses/{id}/leaderboard_export/` 导出课程排名 CSV
 - `GET /api/courses/{id}/report_export/` 导出课程报告 CSV（含分数段）
 - `GET /api/courses/{id}/report/` 课程分数段报告（优秀/良好/及格/不及格/待评分）
+- `GET /api/courses/{id}/pending_list/` 课程待评分学生列表
 - `GET /api/enrollments/` 选课关系
 - `POST /api/enrollments/bulk_create/` 批量创建选课关系
 - `GET /api/enrollments/{id}/summary/` 单个学生在课程内的评分汇总
