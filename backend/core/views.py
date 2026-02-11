@@ -309,6 +309,43 @@ class CourseViewSet(viewsets.ModelViewSet):
             }
         )
 
+
+    @action(detail=True, methods=["get"])
+    def risk_list(self, request, pk=None):
+        course = self.get_object()
+        enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        risk_rows = [
+            row
+            for row in rows
+            if row["total_score"] is not None and row["total_score"] < threshold
+        ]
+        risk_rows.sort(key=lambda item: item["total_score"])  # ascending, lowest first
+
+        page = parse_positive_int(request.query_params.get("page"), 1)
+        page_size = parse_positive_int(request.query_params.get("page_size"), 20)
+        total = len(risk_rows)
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        return Response(
+            {
+                "course_id": course.id,
+                "course_code": course.code,
+                "course_name": course.name,
+                "threshold": threshold,
+                "count": total,
+                "page": page,
+                "page_size": page_size,
+                "results": risk_rows[start:end],
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def pending_list(self, request, pk=None):
         course = self.get_object()
