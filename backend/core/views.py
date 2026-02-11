@@ -263,6 +263,57 @@ class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsTeacher]
 
 
+
+    @action(detail=False, methods=["get"], url_path="workload")
+    def workload(self, request):
+        teacher_id = request.query_params.get("teacher_id")
+        queryset = Course.objects.all()
+        if teacher_id and str(teacher_id).isdigit():
+            queryset = queryset.filter(teacher_id=int(teacher_id))
+
+        results = []
+        total_courses = 0
+        total_enrollments = 0
+        total_pending = 0
+
+        for course in queryset.order_by("id"):
+            enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+            rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+            pending_count = sum(
+                1
+                for row in rows
+                if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
+            )
+
+            total_courses += 1
+            total_enrollments += len(rows)
+            total_pending += pending_count
+
+            results.append(
+                {
+                    "course_id": course.id,
+                    "course_code": course.code,
+                    "course_name": course.name,
+                    "teacher_id": course.teacher_id,
+                    "enrollment_count": len(rows),
+                    "pending_count": pending_count,
+                    "completion_rate": round(
+                        ((len(rows) - pending_count) / len(rows)) * 100, 2
+                    )
+                    if rows
+                    else None,
+                }
+            )
+
+        return Response(
+            {
+                "course_count": total_courses,
+                "enrollment_count": total_enrollments,
+                "pending_count": total_pending,
+                "results": results,
+            }
+        )
+
     @action(detail=False, methods=["get"], url_path="compare")
     def compare(self, request):
         course_ids = request.query_params.getlist("course_ids")

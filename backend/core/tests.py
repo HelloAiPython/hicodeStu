@@ -102,6 +102,21 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertIn("text/csv", response["Content-Type"])
         self.assertIn("attachment; filename=", response["Content-Disposition"])
 
+    def test_course_workload(self):
+        response = self.client.get("/api/courses/workload/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["course_count"], 1)
+        self.assertEqual(data["enrollment_count"], 3)
+        self.assertEqual(data["pending_count"], 1)
+        self.assertEqual(data["results"][0]["pending_count"], 1)
+
+    def test_course_workload_with_teacher_filter(self):
+        response = self.client.get(f"/api/courses/workload/?teacher_id={self.teacher.id}")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["course_count"], 1)
+
     def test_course_compare(self):
         extra_course = Course.objects.create(code="C002", name="英语", teacher=self.teacher)
         ScoreRule.objects.create(course=extra_course, name="classroom", weight=Decimal("50.00"))
