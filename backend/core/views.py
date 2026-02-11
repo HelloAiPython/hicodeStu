@@ -264,6 +264,66 @@ class CourseViewSet(viewsets.ModelViewSet):
 
 
 
+
+    @action(detail=False, methods=["get"], url_path="workload_export")
+    def workload_export(self, request):
+        teacher_id = request.query_params.get("teacher_id")
+        queryset = Course.objects.all()
+        if teacher_id and str(teacher_id).isdigit():
+            queryset = queryset.filter(teacher_id=int(teacher_id))
+
+        rows = []
+        for course in queryset.order_by("id"):
+            enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
+            summary_rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+            pending_count = sum(
+                1
+                for row in summary_rows
+                if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
+            )
+            completion_rate = (
+                round(((len(summary_rows) - pending_count) / len(summary_rows)) * 100, 2)
+                if summary_rows
+                else None
+            )
+            rows.append(
+                {
+                    "course_code": course.code,
+                    "course_name": course.name,
+                    "teacher_id": course.teacher_id,
+                    "enrollment_count": len(summary_rows),
+                    "pending_count": pending_count,
+                    "completion_rate": completion_rate,
+                }
+            )
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="workload_overview.csv"'
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "course_code",
+                "course_name",
+                "teacher_id",
+                "enrollment_count",
+                "pending_count",
+                "completion_rate",
+            ]
+        )
+        for row in rows:
+            writer.writerow(
+                [
+                    row["course_code"],
+                    row["course_name"],
+                    row["teacher_id"],
+                    row["enrollment_count"],
+                    row["pending_count"],
+                    row["completion_rate"],
+                ]
+            )
+
+        return response
+
     @action(detail=False, methods=["get"], url_path="workload")
     def workload(self, request):
         teacher_id = request.query_params.get("teacher_id")

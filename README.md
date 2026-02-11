@@ -64,6 +64,7 @@ npm run dev
 - `GET /api/courses/global_overview/` 全局统计总览
 - `GET /api/courses/compare/?course_ids=<id>&course_ids=<id>` 多课程横向对比
 - `GET /api/courses/workload/?teacher_id=<id>` 教师课程批改工作量总览
+- `GET /api/courses/workload_export/?teacher_id=<id>` 导出教师工作量 CSV
 - `GET /api/courses/{id}/overview/` 课程总体统计（已评分人数、均分）
 - `GET /api/courses/{id}/leaderboard/` 课程排名汇总
 - `GET /api/courses/{id}/leaderboard_export/` 导出课程排名 CSV
