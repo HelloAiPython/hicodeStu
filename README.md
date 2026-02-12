@@ -50,6 +50,15 @@ npm install
 npm run dev
 ```
 
+## 前后端联调（当前已可互通）
+
+1. 启动后端（默认 `127.0.0.1:8000`）。
+2. 启动前端（默认 `127.0.0.1:5173`，已通过 Vite 代理 `/api` 到后端）。
+3. 打开前端页面：
+   - 先在“教师登录（JWT）”输入账号密码获取 token
+   - 再点击“加载看板”请求 `/api/students/alerts_board/`
+   - 可按关键字筛选并下载 CSV（`/api/students/alerts_board_export/`）
+
 ## 下一步建议
 - 建立评分维度、课程、学生、作业等数据模型
 - 使用 DRF ViewSet 与权限类实现教师评分接口
