@@ -221,6 +221,43 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         )
 
 
+
+    @action(detail=True, methods=["get"])
+    def alerts_export(self, request, pk=None):
+        profile = self.get_object()
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
+        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = (
+            f'attachment; filename="{profile.student_number}_alerts.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow(["course_code", "course_name", "status", "total_score", "threshold"])
+
+        for enrollment, row in zip(enrollments, rows):
+            status = "normal"
+            if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"]):
+                status = "pending"
+            elif row["total_score"] < threshold:
+                status = "risk"
+
+            writer.writerow(
+                [
+                    enrollment.course.code,
+                    enrollment.course.name,
+                    status,
+                    row["total_score"],
+                    threshold,
+                ]
+            )
+
+        return response
+
     @action(detail=True, methods=["get"])
     def alerts(self, request, pk=None):
         profile = self.get_object()
