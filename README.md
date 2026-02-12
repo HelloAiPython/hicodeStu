@@ -58,6 +58,7 @@ npm run dev
 ### 已暴露的 API 资源（示例）
 - `GET /api/students/` 学生档案
 - `GET /api/students/search/?q=<关键字>` 按学号搜索学生
+- `GET /api/students/alerts_board/?threshold=<分数>` 学生预警总览看板
 - `GET /api/students/{id}/progress/` 学生跨课程学习进度
 - `GET /api/students/{id}/alerts/?threshold=<分数>` 学生预警信息
 - `GET /api/students/{id}/alerts_export/?threshold=<分数>` 导出学生预警 CSV

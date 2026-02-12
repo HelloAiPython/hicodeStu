@@ -196,6 +196,51 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
     serializer_class = StudentProfileSerializer
     permission_classes = [IsTeacher]
 
+
+    @action(detail=False, methods=["get"], url_path="alerts_board")
+    def alerts_board(self, request):
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        queryset = self.get_queryset().select_related("user").order_by("id")
+        results = []
+        for profile in queryset:
+            enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
+            rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+            pending_count = sum(
+                1
+                for row in rows
+                if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
+            )
+            risk_count = sum(
+                1
+                for row in rows
+                if row["total_score"] is not None and row["total_score"] < threshold
+            )
+            if pending_count == 0 and risk_count == 0:
+                continue
+
+            results.append(
+                {
+                    "student_id": profile.id,
+                    "student_number": profile.student_number,
+                    "username": profile.user.username,
+                    "pending_count": pending_count,
+                    "risk_count": risk_count,
+                }
+            )
+
+        results.sort(key=lambda item: (item["risk_count"], item["pending_count"]), reverse=True)
+        return Response(
+            {
+                "threshold": threshold,
+                "count": len(results),
+                "results": results,
+            }
+        )
+
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
         keyword = (request.query_params.get("q") or "").strip()
