@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -19,6 +19,7 @@ const { Header, Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
 const API_BASE = "/api";
+const TOKEN_STORAGE_KEY = "teacher_access_token";
 
 function buildQuery(params) {
   const searchParams = new URLSearchParams();
@@ -31,12 +32,23 @@ function buildQuery(params) {
   return searchParams.toString();
 }
 
+function csvFilename() {
+  const now = new Date();
+  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
+    now.getDate()
+  ).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(
+    2,
+    "0"
+  )}${String(now.getSeconds()).padStart(2, "0")}`;
+  return `students_alerts_board_${stamp}.csv`;
+}
+
 export default function App() {
   const [messageApi, contextHolder] = message.useMessage();
 
   const [username, setUsername] = useState("teacher");
   const [password, setPassword] = useState("pass123456");
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY) || "");
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [threshold, setThreshold] = useState(80);
@@ -53,6 +65,14 @@ export default function App() {
   });
 
   const hasToken = token.trim().length > 0;
+
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  }, [token]);
 
   const columns = useMemo(
     () => [
@@ -110,6 +130,19 @@ export default function App() {
     }
   };
 
+  const clearSession = () => {
+    setToken("");
+    setBoardData({
+      count: 0,
+      total_count: 0,
+      results: [],
+      threshold,
+      keyword,
+      limit,
+    });
+    messageApi.info("已退出登录");
+  };
+
   const fetchAlertsBoard = async () => {
     if (!hasToken) {
       messageApi.warning("请先登录，再加载预警看板");
@@ -126,6 +159,7 @@ export default function App() {
       });
 
       if (response.status === 401) {
+        setToken("");
         throw new Error("登录已过期，请重新登录");
       }
       if (!response.ok) {
@@ -154,6 +188,10 @@ export default function App() {
           Authorization: `Bearer ${token}`,
         },
       });
+      if (response.status === 401) {
+        setToken("");
+        throw new Error("登录已过期，请重新登录");
+      }
       if (!response.ok) {
         throw new Error(`导出失败（HTTP ${response.status}）`);
       }
@@ -161,7 +199,7 @@ export default function App() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "students_alerts_board.csv";
+      anchor.download = csvFilename();
       anchor.click();
       window.URL.revokeObjectURL(url);
       messageApi.success("CSV 导出成功");
@@ -181,16 +219,29 @@ export default function App() {
 
       <Content style={{ padding: 24 }}>
         <Space direction="vertical" size={16} style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
-          <Card title="1) 教师登录（JWT）">
+          <Card
+            title="1) 教师登录（JWT）"
+            extra={
+              <Button disabled={!hasToken} onClick={clearSession}>
+                退出登录
+              </Button>
+            }
+          >
             <Row gutter={12}>
               <Col xs={24} md={8}>
-                <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="用户名" />
+                <Input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="用户名"
+                  onPressEnter={handleLogin}
+                />
               </Col>
               <Col xs={24} md={8}>
                 <Input.Password
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="密码"
+                  onPressEnter={handleLogin}
                 />
               </Col>
               <Col xs={24} md={8}>
@@ -200,7 +251,7 @@ export default function App() {
               </Col>
             </Row>
             <Paragraph style={{ marginTop: 12, marginBottom: 0 }}>
-              <Text strong>Token 状态：</Text> {hasToken ? "已登录" : "未登录"}
+              <Text strong>Token 状态：</Text> {hasToken ? "已登录（会话已持久化）" : "未登录"}
             </Paragraph>
           </Card>
 
@@ -220,6 +271,7 @@ export default function App() {
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="筛选关键字（学号/用户名）"
+                  onPressEnter={fetchAlertsBoard}
                 />
               </Col>
               <Col xs={24} md={4}>
