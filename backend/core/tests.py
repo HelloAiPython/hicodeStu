@@ -243,11 +243,24 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["count"], 2)
+        self.assertEqual(data["total_count"], 2)
+        self.assertEqual(data["limit"], 50)
         self.assertEqual(len(data["results"]), 2)
         self.assertEqual(data["results"][0]["student_number"], "S002")
         self.assertEqual(data["results"][0]["risk_count"], 1)
         self.assertEqual(data["results"][1]["student_number"], "S003")
         self.assertEqual(data["results"][1]["pending_count"], 1)
+
+    def test_student_alerts_board_keyword_and_limit(self):
+        response = self.client.get("/api/students/alerts_board/?threshold=80&q=stu&limit=1")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["keyword"], "stu")
+        self.assertEqual(data["limit"], 1)
+        self.assertEqual(data["total_count"], 2)
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["student_number"], "S002")
 
     def test_student_alerts_board_export_csv(self):
         response = self.client.get("/api/students/alerts_board_export/?threshold=80")
@@ -257,6 +270,13 @@ class LeaderboardApiTests(BaseApiFixture):
         lines = response.content.decode("utf-8").strip().splitlines()
         self.assertGreaterEqual(len(lines), 3)
         self.assertIn("student_number,username,pending_count,risk_count,threshold", lines[0])
+
+    def test_student_alerts_board_export_with_keyword(self):
+        response = self.client.get("/api/students/alerts_board_export/?threshold=80&q=S003")
+        self.assertEqual(response.status_code, 200)
+        lines = response.content.decode("utf-8").strip().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("S003,"))
 
     def test_classroom_score_bulk_create(self):
         enrollment = self.students[2][1]

@@ -1,5 +1,6 @@
 import csv
 
+from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
@@ -236,7 +237,16 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         if threshold is None:
             threshold = 60.0
 
-        queryset = self.get_queryset().select_related("user").order_by("id")
+        keyword = (request.query_params.get("q") or "").strip()
+        limit = parse_positive_int(request.query_params.get("limit"), 50)
+
+        queryset = self.get_queryset().select_related("user")
+        if keyword:
+            queryset = queryset.filter(
+                Q(student_number__icontains=keyword) | Q(user__username__icontains=keyword)
+            )
+        queryset = queryset.order_by("id")
+
         results = []
         for profile in queryset:
             summary = student_alerts_rows(profile, threshold)
@@ -254,11 +264,15 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             )
 
         results.sort(key=lambda item: (item["risk_count"], item["pending_count"]), reverse=True)
+        limited_results = results[:limit]
         return Response(
             {
                 "threshold": threshold,
-                "count": len(results),
-                "results": results,
+                "keyword": keyword,
+                "limit": limit,
+                "count": len(limited_results),
+                "total_count": len(results),
+                "results": limited_results,
             }
         )
 
@@ -268,7 +282,15 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         if threshold is None:
             threshold = 60.0
 
-        queryset = self.get_queryset().select_related("user").order_by("id")
+        keyword = (request.query_params.get("q") or "").strip()
+
+        queryset = self.get_queryset().select_related("user")
+        if keyword:
+            queryset = queryset.filter(
+                Q(student_number__icontains=keyword) | Q(user__username__icontains=keyword)
+            )
+        queryset = queryset.order_by("id")
+
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = 'attachment; filename="students_alerts_board.csv"'
         writer = csv.writer(response)
