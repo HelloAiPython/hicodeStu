@@ -130,6 +130,39 @@ def student_progress(profile):
 
 
 
+def student_alerts_rows(profile, threshold):
+    enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
+    rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+
+    pending_courses = [
+        {
+            "course_id": enrollment.course_id,
+            "course_code": enrollment.course.code,
+            "course_name": enrollment.course.name,
+        }
+        for enrollment, row in zip(enrollments, rows)
+        if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
+    ]
+    risk_courses = [
+        {
+            "course_id": enrollment.course_id,
+            "course_code": enrollment.course.code,
+            "course_name": enrollment.course.name,
+            "total_score": row["total_score"],
+        }
+        for enrollment, row in zip(enrollments, rows)
+        if row["total_score"] is not None and row["total_score"] < threshold
+    ]
+    risk_courses.sort(key=lambda item: item["total_score"])
+
+    return {
+        "pending_count": len(pending_courses),
+        "risk_count": len(risk_courses),
+        "pending_courses": pending_courses,
+        "risk_courses": risk_courses,
+    }
+
+
 def enrollment_history(enrollment):
     classroom_items = list(
         ClassroomScore.objects.filter(enrollment=enrollment)
@@ -206,20 +239,8 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset().select_related("user").order_by("id")
         results = []
         for profile in queryset:
-            enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
-            rows = [enrollment_summary(enrollment) for enrollment in enrollments]
-
-            pending_count = sum(
-                1
-                for row in rows
-                if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
-            )
-            risk_count = sum(
-                1
-                for row in rows
-                if row["total_score"] is not None and row["total_score"] < threshold
-            )
-            if pending_count == 0 and risk_count == 0:
+            summary = student_alerts_rows(profile, threshold)
+            if summary["pending_count"] == 0 and summary["risk_count"] == 0:
                 continue
 
             results.append(
@@ -227,8 +248,8 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
                     "student_id": profile.id,
                     "student_number": profile.student_number,
                     "username": profile.user.username,
-                    "pending_count": pending_count,
-                    "risk_count": risk_count,
+                    "pending_count": summary["pending_count"],
+                    "risk_count": summary["risk_count"],
                 }
             )
 
@@ -240,6 +261,35 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
                 "results": results,
             }
         )
+
+    @action(detail=False, methods=["get"], url_path="alerts_board_export")
+    def alerts_board_export(self, request):
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        queryset = self.get_queryset().select_related("user").order_by("id")
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="students_alerts_board.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["student_number", "username", "pending_count", "risk_count", "threshold"])
+
+        for profile in queryset:
+            summary = student_alerts_rows(profile, threshold)
+            if summary["pending_count"] == 0 and summary["risk_count"] == 0:
+                continue
+
+            writer.writerow(
+                [
+                    profile.student_number,
+                    profile.user.username,
+                    summary["pending_count"],
+                    summary["risk_count"],
+                    threshold,
+                ]
+            )
+
+        return response
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
@@ -310,39 +360,17 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         if threshold is None:
             threshold = 60.0
 
-        enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
-
-        pending_courses = [
-            {
-                "course_id": enrollment.course_id,
-                "course_code": enrollment.course.code,
-                "course_name": enrollment.course.name,
-            }
-            for enrollment, row in zip(enrollments, rows)
-            if row["total_score"] is None or not (row["has_classroom"] and row["has_homework"])
-        ]
-        risk_courses = [
-            {
-                "course_id": enrollment.course_id,
-                "course_code": enrollment.course.code,
-                "course_name": enrollment.course.name,
-                "total_score": row["total_score"],
-            }
-            for enrollment, row in zip(enrollments, rows)
-            if row["total_score"] is not None and row["total_score"] < threshold
-        ]
-        risk_courses.sort(key=lambda item: item["total_score"])
+        summary = student_alerts_rows(profile, threshold)
 
         return Response(
             {
                 "student_id": profile.id,
                 "student_number": profile.student_number,
                 "threshold": threshold,
-                "pending_count": len(pending_courses),
-                "risk_count": len(risk_courses),
-                "pending_courses": pending_courses,
-                "risk_courses": risk_courses,
+                "pending_count": summary["pending_count"],
+                "risk_count": summary["risk_count"],
+                "pending_courses": summary["pending_courses"],
+                "risk_courses": summary["risk_courses"],
             }
         )
 

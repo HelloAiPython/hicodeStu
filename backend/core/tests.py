@@ -249,6 +249,15 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["results"][1]["student_number"], "S003")
         self.assertEqual(data["results"][1]["pending_count"], 1)
 
+    def test_student_alerts_board_export_csv(self):
+        response = self.client.get("/api/students/alerts_board_export/?threshold=80")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response["Content-Type"])
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
+        lines = response.content.decode("utf-8").strip().splitlines()
+        self.assertGreaterEqual(len(lines), 3)
+        self.assertIn("student_number,username,pending_count,risk_count,threshold", lines[0])
+
     def test_classroom_score_bulk_create(self):
         enrollment = self.students[2][1]
         response = self.client.post(
