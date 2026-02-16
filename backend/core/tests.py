@@ -278,6 +278,31 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["pending_total"], 1)
         self.assertEqual(data["risk_total"], 0)
 
+    def test_student_alerts_board_risk_only(self):
+        response = self.client.get("/api/students/alerts_board/?threshold=80&risk_only=1")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["risk_only"])
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["total_count"], 1)
+        self.assertEqual(data["results"][0]["student_number"], "S002")
+
+    def test_student_alerts_board_stats_risk_only(self):
+        response = self.client.get("/api/students/alerts_board_stats/?threshold=80&risk_only=1")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["risk_only"])
+        self.assertEqual(data["alert_student_count"], 1)
+        self.assertEqual(data["pending_total"], 0)
+        self.assertEqual(data["risk_total"], 1)
+
+    def test_student_alerts_board_export_risk_only(self):
+        response = self.client.get("/api/students/alerts_board_export/?threshold=80&risk_only=1")
+        self.assertEqual(response.status_code, 200)
+        lines = response.content.decode("utf-8").strip().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("S002,"))
+
     def test_student_alerts_board_export_csv(self):
         response = self.client.get("/api/students/alerts_board_export/?threshold=80")
         self.assertEqual(response.status_code, 200)

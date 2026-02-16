@@ -164,7 +164,7 @@ def student_alerts_rows(profile, threshold):
     }
 
 
-def student_alerts_board_rows(queryset, threshold):
+def student_alerts_board_rows(queryset, threshold, risk_only=False):
     results = []
     total_pending_count = 0
     total_risk_count = 0
@@ -172,6 +172,8 @@ def student_alerts_board_rows(queryset, threshold):
     for profile in queryset:
         summary = student_alerts_rows(profile, threshold)
         if summary["pending_count"] == 0 and summary["risk_count"] == 0:
+            continue
+        if risk_only and summary["risk_count"] == 0:
             continue
 
         total_pending_count += summary["pending_count"]
@@ -251,6 +253,10 @@ def parse_positive_int(raw_value, default):
     return value if value > 0 else default
 
 
+def parse_bool_flag(raw_value):
+    return str(raw_value).lower() in {"1", "true", "yes", "y", "on"}
+
+
 class IsTeacher(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:
         return request.user and request.user.is_authenticated and request.user.is_staff
@@ -270,6 +276,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
 
         keyword = (request.query_params.get("q") or "").strip()
         limit = parse_positive_int(request.query_params.get("limit"), 50)
+        risk_only = parse_bool_flag(request.query_params.get("risk_only"))
 
         queryset = self.get_queryset().select_related("user")
         if keyword:
@@ -278,13 +285,14 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             )
         queryset = queryset.order_by("id")
 
-        board = student_alerts_board_rows(queryset, threshold)
+        board = student_alerts_board_rows(queryset, threshold, risk_only=risk_only)
         limited_results = board["results"][:limit]
         return Response(
             {
                 "threshold": threshold,
                 "keyword": keyword,
                 "limit": limit,
+                "risk_only": risk_only,
                 "count": len(limited_results),
                 "total_count": board["student_count"],
                 "results": limited_results,
@@ -298,6 +306,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             threshold = 60.0
 
         keyword = (request.query_params.get("q") or "").strip()
+        risk_only = parse_bool_flag(request.query_params.get("risk_only"))
 
         queryset = self.get_queryset().select_related("user")
         if keyword:
@@ -311,7 +320,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         writer = csv.writer(response)
         writer.writerow(["student_number", "username", "pending_count", "risk_count", "threshold"])
 
-        board = student_alerts_board_rows(queryset, threshold)
+        board = student_alerts_board_rows(queryset, threshold, risk_only=risk_only)
         for row in board["results"]:
             writer.writerow(
                 [
@@ -332,6 +341,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             threshold = 60.0
 
         keyword = (request.query_params.get("q") or "").strip()
+        risk_only = parse_bool_flag(request.query_params.get("risk_only"))
 
         queryset = self.get_queryset().select_related("user")
         if keyword:
@@ -340,11 +350,12 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             )
         queryset = queryset.order_by("id")
 
-        board = student_alerts_board_rows(queryset, threshold)
+        board = student_alerts_board_rows(queryset, threshold, risk_only=risk_only)
         return Response(
             {
                 "threshold": threshold,
                 "keyword": keyword,
+                "risk_only": risk_only,
                 "alert_student_count": board["student_count"],
                 "pending_total": board["pending_total"],
                 "risk_total": board["risk_total"],

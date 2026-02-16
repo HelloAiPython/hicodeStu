@@ -10,6 +10,7 @@ import {
   Row,
   Space,
   Statistic,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -61,6 +62,7 @@ export default function App() {
   const [threshold, setThreshold] = useState(80);
   const [keyword, setKeyword] = useState("");
   const [limit, setLimit] = useState(20);
+  const [riskOnly, setRiskOnly] = useState(false);
   const [boardLoading, setBoardLoading] = useState(false);
   const [boardData, setBoardData] = useState({
     count: 0,
@@ -193,7 +195,7 @@ export default function App() {
       return;
     }
     try {
-      const query = buildQuery({ threshold, q: keyword });
+      const query = buildQuery({ threshold, q: keyword, risk_only: riskOnly ? 1 : 0 });
       const response = await authFetch(`${API_BASE}/students/alerts_board_stats/?${query}`);
       if (!response.ok) {
         throw new Error(`统计加载失败（HTTP ${response.status}）`);
@@ -213,7 +215,7 @@ export default function App() {
 
     setBoardLoading(true);
     try {
-      const query = buildQuery({ threshold, q: keyword, limit });
+      const query = buildQuery({ threshold, q: keyword, limit, risk_only: riskOnly ? 1 : 0 });
       const response = await authFetch(`${API_BASE}/students/alerts_board/?${query}`);
 
       if (!response.ok) {
@@ -256,7 +258,7 @@ export default function App() {
       setRefreshToken(payload.refresh);
       messageApi.success("登录成功，已获取 access / refresh token");
 
-      const query = buildQuery({ threshold, q: keyword, limit });
+      const query = buildQuery({ threshold, q: keyword, limit, risk_only: riskOnly ? 1 : 0 });
       const boardResponse = await fetch(`${API_BASE}/students/alerts_board/?${query}`, {
         headers: {
           Authorization: `Bearer ${payload.access}`,
@@ -280,7 +282,7 @@ export default function App() {
       return;
     }
     try {
-      const query = buildQuery({ threshold, q: keyword });
+      const query = buildQuery({ threshold, q: keyword, risk_only: riskOnly ? 1 : 0 });
       const response = await authFetch(`${API_BASE}/students/alerts_board_export/?${query}`);
       if (!response.ok) {
         throw new Error(`导出失败（HTTP ${response.status}）`);
@@ -373,7 +375,13 @@ export default function App() {
                   addonBefore="限制"
                 />
               </Col>
-              <Col xs={24} md={6}>
+              <Col xs={24} md={3}>
+                <Space>
+                  <Switch checked={riskOnly} onChange={setRiskOnly} />
+                  <Text>仅风险</Text>
+                </Space>
+              </Col>
+              <Col xs={24} md={3}>
                 <Space style={{ width: "100%" }}>
                   <Button type="primary" loading={boardLoading} onClick={fetchAlertsBoard}>
                     加载看板
