@@ -262,6 +262,22 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(len(data["results"]), 1)
         self.assertEqual(data["results"][0]["student_number"], "S002")
 
+    def test_student_alerts_board_stats(self):
+        response = self.client.get("/api/students/alerts_board_stats/?threshold=80")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["alert_student_count"], 2)
+        self.assertEqual(data["pending_total"], 1)
+        self.assertEqual(data["risk_total"], 1)
+
+    def test_student_alerts_board_stats_with_keyword(self):
+        response = self.client.get("/api/students/alerts_board_stats/?threshold=80&q=S003")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["alert_student_count"], 1)
+        self.assertEqual(data["pending_total"], 1)
+        self.assertEqual(data["risk_total"], 0)
+
     def test_student_alerts_board_export_csv(self):
         response = self.client.get("/api/students/alerts_board_export/?threshold=80")
         self.assertEqual(response.status_code, 200)

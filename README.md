@@ -56,7 +56,7 @@ npm run dev
 2. 启动前端（默认 `127.0.0.1:5173`，已通过 Vite 代理 `/api` 到后端）。
 3. 打开前端页面：
    - 先在“教师登录（JWT）”输入账号密码获取 token（access/refresh token 会持久化到浏览器本地）
-   - 再点击“加载看板”请求 `/api/students/alerts_board/`（支持回车触发）
+   - 再点击“加载看板”请求 `/api/students/alerts_board/`（支持回车触发，同时加载统计卡片）
    - 可按关键字筛选并下载 CSV（`/api/students/alerts_board_export/`）
    - 可点击“退出登录”清除本地会话；access 过期时会自动尝试 refresh token 续期
 
@@ -70,6 +70,7 @@ npm run dev
 - `GET /api/students/search/?q=<关键字>` 按学号搜索学生
 - `GET /api/students/alerts_board/?threshold=<分数>&q=<关键字>&limit=<数量>` 学生预警总览看板（支持按学号/用户名筛选与数量限制）
 - `GET /api/students/alerts_board_export/?threshold=<分数>&q=<关键字>` 导出学生预警总览 CSV（支持筛选）
+- `GET /api/students/alerts_board_stats/?threshold=<分数>&q=<关键字>` 学生预警总览统计（预警学生数/待处理总数/风险总数）
 - `GET /api/students/{id}/progress/` 学生跨课程学习进度
 - `GET /api/students/{id}/alerts/?threshold=<分数>` 学生预警信息
 - `GET /api/students/{id}/alerts_export/?threshold=<分数>` 导出学生预警 CSV

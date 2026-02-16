@@ -164,6 +164,37 @@ def student_alerts_rows(profile, threshold):
     }
 
 
+def student_alerts_board_rows(queryset, threshold):
+    results = []
+    total_pending_count = 0
+    total_risk_count = 0
+
+    for profile in queryset:
+        summary = student_alerts_rows(profile, threshold)
+        if summary["pending_count"] == 0 and summary["risk_count"] == 0:
+            continue
+
+        total_pending_count += summary["pending_count"]
+        total_risk_count += summary["risk_count"]
+        results.append(
+            {
+                "student_id": profile.id,
+                "student_number": profile.student_number,
+                "username": profile.user.username,
+                "pending_count": summary["pending_count"],
+                "risk_count": summary["risk_count"],
+            }
+        )
+
+    results.sort(key=lambda item: (item["risk_count"], item["pending_count"]), reverse=True)
+    return {
+        "results": results,
+        "student_count": len(results),
+        "pending_total": total_pending_count,
+        "risk_total": total_risk_count,
+    }
+
+
 def enrollment_history(enrollment):
     classroom_items = list(
         ClassroomScore.objects.filter(enrollment=enrollment)
@@ -247,31 +278,15 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             )
         queryset = queryset.order_by("id")
 
-        results = []
-        for profile in queryset:
-            summary = student_alerts_rows(profile, threshold)
-            if summary["pending_count"] == 0 and summary["risk_count"] == 0:
-                continue
-
-            results.append(
-                {
-                    "student_id": profile.id,
-                    "student_number": profile.student_number,
-                    "username": profile.user.username,
-                    "pending_count": summary["pending_count"],
-                    "risk_count": summary["risk_count"],
-                }
-            )
-
-        results.sort(key=lambda item: (item["risk_count"], item["pending_count"]), reverse=True)
-        limited_results = results[:limit]
+        board = student_alerts_board_rows(queryset, threshold)
+        limited_results = board["results"][:limit]
         return Response(
             {
                 "threshold": threshold,
                 "keyword": keyword,
                 "limit": limit,
                 "count": len(limited_results),
-                "total_count": len(results),
+                "total_count": board["student_count"],
                 "results": limited_results,
             }
         )
@@ -296,22 +311,45 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         writer = csv.writer(response)
         writer.writerow(["student_number", "username", "pending_count", "risk_count", "threshold"])
 
-        for profile in queryset:
-            summary = student_alerts_rows(profile, threshold)
-            if summary["pending_count"] == 0 and summary["risk_count"] == 0:
-                continue
-
+        board = student_alerts_board_rows(queryset, threshold)
+        for row in board["results"]:
             writer.writerow(
                 [
-                    profile.student_number,
-                    profile.user.username,
-                    summary["pending_count"],
-                    summary["risk_count"],
+                    row["student_number"],
+                    row["username"],
+                    row["pending_count"],
+                    row["risk_count"],
                     threshold,
                 ]
             )
 
         return response
+
+    @action(detail=False, methods=["get"], url_path="alerts_board_stats")
+    def alerts_board_stats(self, request):
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        keyword = (request.query_params.get("q") or "").strip()
+
+        queryset = self.get_queryset().select_related("user")
+        if keyword:
+            queryset = queryset.filter(
+                Q(student_number__icontains=keyword) | Q(user__username__icontains=keyword)
+            )
+        queryset = queryset.order_by("id")
+
+        board = student_alerts_board_rows(queryset, threshold)
+        return Response(
+            {
+                "threshold": threshold,
+                "keyword": keyword,
+                "alert_student_count": board["student_count"],
+                "pending_total": board["pending_total"],
+                "risk_total": board["risk_total"],
+            }
+        )
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):

@@ -9,6 +9,7 @@ import {
   Layout,
   Row,
   Space,
+  Statistic,
   Table,
   Tag,
   Typography,
@@ -69,6 +70,11 @@ export default function App() {
     keyword: "",
     limit: 20,
   });
+  const [statsData, setStatsData] = useState({
+    alert_student_count: 0,
+    pending_total: 0,
+    risk_total: 0,
+  });
 
   const hasSession = accessToken.trim().length > 0;
 
@@ -98,6 +104,11 @@ export default function App() {
       threshold,
       keyword,
       limit,
+    });
+    setStatsData({
+      alert_student_count: 0,
+      pending_total: 0,
+      risk_total: 0,
     });
     messageApi.info(notice);
   };
@@ -177,6 +188,23 @@ export default function App() {
     []
   );
 
+  const fetchAlertsStats = async () => {
+    if (!hasSession) {
+      return;
+    }
+    try {
+      const query = buildQuery({ threshold, q: keyword });
+      const response = await authFetch(`${API_BASE}/students/alerts_board_stats/?${query}`);
+      if (!response.ok) {
+        throw new Error(`统计加载失败（HTTP ${response.status}）`);
+      }
+      const payload = await response.json();
+      setStatsData(payload);
+    } catch (error) {
+      messageApi.error(error.message || "统计加载失败");
+    }
+  };
+
   const fetchAlertsBoard = async () => {
     if (!hasSession) {
       messageApi.warning("请先登录，再加载预警看板");
@@ -194,7 +222,12 @@ export default function App() {
 
       const payload = await response.json();
       setBoardData(payload);
+      setStatsData((current) => ({
+        ...current,
+        alert_student_count: payload.total_count ?? 0,
+      }));
       messageApi.success("预警看板加载成功");
+      await fetchAlertsStats();
     } catch (error) {
       messageApi.error(error.message || "加载失败");
     } finally {
@@ -233,6 +266,7 @@ export default function App() {
         const boardPayload = await boardResponse.json();
         setBoardData(boardPayload);
       }
+      await fetchAlertsStats();
     } catch (error) {
       messageApi.error(error.message || "登录失败");
     } finally {
@@ -357,6 +391,24 @@ export default function App() {
                 message="尚未登录：请先获取 JWT token 再请求看板。"
               />
             )}
+
+            <Row gutter={[12, 12]} style={{ marginTop: 12, marginBottom: 12 }}>
+              <Col xs={24} md={8}>
+                <Card>
+                  <Statistic title="预警学生数" value={statsData.alert_student_count} />
+                </Card>
+              </Col>
+              <Col xs={24} md={8}>
+                <Card>
+                  <Statistic title="待处理课程总数" value={statsData.pending_total} />
+                </Card>
+              </Col>
+              <Col xs={24} md={8}>
+                <Card>
+                  <Statistic title="风险课程总数" value={statsData.risk_total} valueStyle={{ color: "#cf1322" }} />
+                </Card>
+              </Col>
+            </Row>
 
             <Paragraph style={{ marginTop: 12 }} type="secondary">
               返回记录：{boardData.count} / 总命中：{boardData.total_count} / 当前阈值：{boardData.threshold}
