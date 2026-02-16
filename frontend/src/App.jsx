@@ -19,7 +19,8 @@ const { Header, Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
 const API_BASE = "/api";
-const TOKEN_STORAGE_KEY = "teacher_access_token";
+const ACCESS_TOKEN_STORAGE_KEY = "teacher_access_token";
+const REFRESH_TOKEN_STORAGE_KEY = "teacher_refresh_token";
 
 function buildQuery(params) {
   const searchParams = new URLSearchParams();
@@ -48,7 +49,12 @@ export default function App() {
 
   const [username, setUsername] = useState("teacher");
   const [password, setPassword] = useState("pass123456");
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY) || "");
+  const [accessToken, setAccessToken] = useState(
+    () => localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) || ""
+  );
+  const [refreshToken, setRefreshToken] = useState(
+    () => localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) || ""
+  );
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [threshold, setThreshold] = useState(80);
@@ -64,15 +70,82 @@ export default function App() {
     limit: 20,
   });
 
-  const hasToken = token.trim().length > 0;
+  const hasSession = accessToken.trim().length > 0;
 
   useEffect(() => {
-    if (token) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    if (accessToken) {
+      localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
     } else {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
     }
-  }, [token]);
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+    } else {
+      localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    }
+  }, [refreshToken]);
+
+  const clearSession = (notice = "已退出登录") => {
+    setAccessToken("");
+    setRefreshToken("");
+    setBoardData({
+      count: 0,
+      total_count: 0,
+      results: [],
+      threshold,
+      keyword,
+      limit,
+    });
+    messageApi.info(notice);
+  };
+
+  const tryRefreshAccessToken = async () => {
+    if (!refreshToken) {
+      return null;
+    }
+    const response = await fetch(`${API_BASE}/auth/token/refresh/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = await response.json();
+    if (!payload.access) {
+      return null;
+    }
+    setAccessToken(payload.access);
+    return payload.access;
+  };
+
+  const authFetch = async (url, options = {}) => {
+    const execute = async (tokenValue) =>
+      fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${tokenValue}`,
+        },
+      });
+
+    let response = await execute(accessToken);
+    if (response.status !== 401) {
+      return response;
+    }
+
+    const renewedAccess = await tryRefreshAccessToken();
+    if (!renewedAccess) {
+      clearSession("登录已过期，请重新登录");
+      return response;
+    }
+
+    response = await execute(renewedAccess);
+    return response;
+  };
 
   const columns = useMemo(
     () => [
@@ -104,47 +177,8 @@ export default function App() {
     []
   );
 
-  const handleLogin = async () => {
-    setLoginLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/auth/token/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`登录失败（HTTP ${response.status}）`);
-      }
-
-      const payload = await response.json();
-      if (!payload.access) {
-        throw new Error("登录返回中未包含 access token");
-      }
-      setToken(payload.access);
-      messageApi.success("登录成功，已获取 access token");
-    } catch (error) {
-      messageApi.error(error.message || "登录失败");
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const clearSession = () => {
-    setToken("");
-    setBoardData({
-      count: 0,
-      total_count: 0,
-      results: [],
-      threshold,
-      keyword,
-      limit,
-    });
-    messageApi.info("已退出登录");
-  };
-
   const fetchAlertsBoard = async () => {
-    if (!hasToken) {
+    if (!hasSession) {
       messageApi.warning("请先登录，再加载预警看板");
       return;
     }
@@ -152,16 +186,8 @@ export default function App() {
     setBoardLoading(true);
     try {
       const query = buildQuery({ threshold, q: keyword, limit });
-      const response = await fetch(`${API_BASE}/students/alerts_board/?${query}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await authFetch(`${API_BASE}/students/alerts_board/?${query}`);
 
-      if (response.status === 401) {
-        setToken("");
-        throw new Error("登录已过期，请重新登录");
-      }
       if (!response.ok) {
         throw new Error(`加载失败（HTTP ${response.status}）`);
       }
@@ -176,22 +202,52 @@ export default function App() {
     }
   };
 
+  const handleLogin = async () => {
+    setLoginLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/auth/token/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`登录失败（HTTP ${response.status}）`);
+      }
+
+      const payload = await response.json();
+      if (!payload.access || !payload.refresh) {
+        throw new Error("登录返回中未包含完整 token（access + refresh）");
+      }
+      setAccessToken(payload.access);
+      setRefreshToken(payload.refresh);
+      messageApi.success("登录成功，已获取 access / refresh token");
+
+      const query = buildQuery({ threshold, q: keyword, limit });
+      const boardResponse = await fetch(`${API_BASE}/students/alerts_board/?${query}`, {
+        headers: {
+          Authorization: `Bearer ${payload.access}`,
+        },
+      });
+      if (boardResponse.ok) {
+        const boardPayload = await boardResponse.json();
+        setBoardData(boardPayload);
+      }
+    } catch (error) {
+      messageApi.error(error.message || "登录失败");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   const handleExport = async () => {
-    if (!hasToken) {
+    if (!hasSession) {
       messageApi.warning("请先登录，再导出 CSV");
       return;
     }
     try {
       const query = buildQuery({ threshold, q: keyword });
-      const response = await fetch(`${API_BASE}/students/alerts_board_export/?${query}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.status === 401) {
-        setToken("");
-        throw new Error("登录已过期，请重新登录");
-      }
+      const response = await authFetch(`${API_BASE}/students/alerts_board_export/?${query}`);
       if (!response.ok) {
         throw new Error(`导出失败（HTTP ${response.status}）`);
       }
@@ -222,7 +278,7 @@ export default function App() {
           <Card
             title="1) 教师登录（JWT）"
             extra={
-              <Button disabled={!hasToken} onClick={clearSession}>
+              <Button disabled={!hasSession} onClick={() => clearSession()}>
                 退出登录
               </Button>
             }
@@ -251,7 +307,7 @@ export default function App() {
               </Col>
             </Row>
             <Paragraph style={{ marginTop: 12, marginBottom: 0 }}>
-              <Text strong>Token 状态：</Text> {hasToken ? "已登录（会话已持久化）" : "未登录"}
+              <Text strong>Token 状态：</Text> {hasSession ? "已登录（支持自动刷新）" : "未登录"}
             </Paragraph>
           </Card>
 
@@ -293,7 +349,7 @@ export default function App() {
               </Col>
             </Row>
 
-            {!hasToken && (
+            {!hasSession && (
               <Alert
                 style={{ marginTop: 12 }}
                 type="warning"
