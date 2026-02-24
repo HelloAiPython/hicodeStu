@@ -335,18 +335,17 @@ export default function App() {
     setSelectedStudent(record);
     setDetailLoading(true);
     try {
-      const [alertsResp, progressResp] = await Promise.all([
-        authFetch(`${API_BASE}/students/${record.student_id}/alerts/?threshold=${threshold}`),
-        authFetch(`${API_BASE}/students/${record.student_id}/progress/`),
-      ]);
-
-      if (!alertsResp.ok || !progressResp.ok) {
+      const response = await authFetch(
+        `${API_BASE}/students/${record.student_id}/detail_dashboard/?threshold=${threshold}`
+      );
+      if (!response.ok) {
         throw new Error("详情加载失败");
       }
-
-      const alerts = await alertsResp.json();
-      const progress = await progressResp.json();
-      setStudentDetail({ alerts, progress });
+      const payload = await response.json();
+      setStudentDetail({
+        alerts: payload.alerts || null,
+        progress: payload.progress || null,
+      });
     } catch (error) {
       messageApi.error(error.message || "详情加载失败");
     } finally {

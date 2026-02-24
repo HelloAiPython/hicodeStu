@@ -73,6 +73,7 @@ npm run dev
 - `GET /api/students/alerts_board_export/?threshold=<分数>&q=<关键字>&risk_only=1&pending_only=1` 导出学生预警总览 CSV（支持筛选与仅风险/仅待处理过滤）
 - `GET /api/students/alerts_board_stats/?threshold=<分数>&q=<关键字>&risk_only=1&pending_only=1` 学生预警总览统计（预警学生数/待处理总数/风险总数，支持仅风险/仅待处理过滤）
 - `GET /api/students/{id}/progress/` 学生跨课程学习进度
+- `GET /api/students/{id}/detail_dashboard/?threshold=<分数>` 学生详情面板（预警+学习进度）
 - `GET /api/students/{id}/alerts/?threshold=<分数>` 学生预警信息
 - `GET /api/students/{id}/alerts_export/?threshold=<分数>` 导出学生预警 CSV
 - `GET /api/students/{id}/progress_export/` 导出学生学习进度 CSV

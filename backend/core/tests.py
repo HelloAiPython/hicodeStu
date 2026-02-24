@@ -453,6 +453,17 @@ class ReportAndProgressApiTests(BaseApiFixture):
         self.assertEqual(data["scored_course_count"], 1)
         self.assertIsNotNone(data["overall_average"])
 
+    def test_student_detail_dashboard(self):
+        student_profile = self.students[1][0]
+        response = self.client.get(f"/api/students/{student_profile.id}/detail_dashboard/?threshold=80")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["student_number"], "S002")
+        self.assertIn("alerts", data)
+        self.assertIn("progress", data)
+        self.assertEqual(data["alerts"]["risk_count"], 1)
+        self.assertEqual(data["progress"]["course_count"], 1)
+
 
     def test_enrollment_history(self):
         enrollment = self.students[0][1]

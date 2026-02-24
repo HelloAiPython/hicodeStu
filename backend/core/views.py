@@ -457,6 +457,30 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["get"], url_path="detail_dashboard")
+    def detail_dashboard(self, request, pk=None):
+        profile = self.get_object()
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        alerts_payload = student_alerts_rows(profile, threshold)
+        progress_payload = student_progress(profile)
+        return Response(
+            {
+                "student_id": profile.id,
+                "student_number": profile.student_number,
+                "threshold": threshold,
+                "alerts": {
+                    "pending_count": alerts_payload["pending_count"],
+                    "risk_count": alerts_payload["risk_count"],
+                    "pending_courses": alerts_payload["pending_courses"],
+                    "risk_courses": alerts_payload["risk_courses"],
+                },
+                "progress": progress_payload,
+            }
+        )
+
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
         profile = self.get_object()
