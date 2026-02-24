@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Col,
+  Drawer,
   Input,
   InputNumber,
   Layout,
@@ -12,6 +13,7 @@ import {
   Statistic,
   Switch,
   Table,
+  Tabs,
   Tag,
   Typography,
   message,
@@ -79,6 +81,12 @@ export default function App() {
     pending_total: 0,
     risk_total: 0,
   });
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [studentDetail, setStudentDetail] = useState({
+    alerts: null,
+    progress: null,
+  });
 
   const hasSession = accessToken.trim().length > 0;
 
@@ -114,6 +122,8 @@ export default function App() {
       pending_total: 0,
       risk_total: 0,
     });
+    setSelectedStudent(null);
+    setStudentDetail({ alerts: null, progress: null });
     messageApi.info(notice);
   };
 
@@ -196,6 +206,15 @@ export default function App() {
         key: "risk_count",
         render: (value) =>
           value > 0 ? <Tag color="red">{value}</Tag> : <Tag>{value}</Tag>,
+      },
+      {
+        title: "操作",
+        key: "actions",
+        render: (_, record) => (
+          <Button size="small" onClick={() => openStudentDetail(record)}>
+            查看详情
+          </Button>
+        ),
       },
     ],
     []
@@ -309,6 +328,29 @@ export default function App() {
       messageApi.success("CSV 导出成功");
     } catch (error) {
       messageApi.error(error.message || "导出失败");
+    }
+  };
+
+  const openStudentDetail = async (record) => {
+    setSelectedStudent(record);
+    setDetailLoading(true);
+    try {
+      const [alertsResp, progressResp] = await Promise.all([
+        authFetch(`${API_BASE}/students/${record.student_id}/alerts/?threshold=${threshold}`),
+        authFetch(`${API_BASE}/students/${record.student_id}/progress/`),
+      ]);
+
+      if (!alertsResp.ok || !progressResp.ok) {
+        throw new Error("详情加载失败");
+      }
+
+      const alerts = await alertsResp.json();
+      const progress = await progressResp.json();
+      setStudentDetail({ alerts, progress });
+    } catch (error) {
+      messageApi.error(error.message || "详情加载失败");
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -449,6 +491,55 @@ export default function App() {
               pagination={false}
             />
           </Card>
+
+          <Drawer
+            title="3) 学生详情（alerts + progress）"
+            placement="right"
+            width={560}
+            open={Boolean(selectedStudent)}
+            onClose={() => setSelectedStudent(null)}
+          >
+            {selectedStudent && (
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Text strong>学号：{selectedStudent.student_number}</Text>
+                <Text>用户名：{selectedStudent.username}</Text>
+                <Tabs
+                  items={[
+                    {
+                      key: "alerts",
+                      label: "预警详情",
+                      children: (
+                        <Space direction="vertical" style={{ width: "100%" }}>
+                          <Text>待处理课程数：{studentDetail.alerts?.pending_count ?? "-"}</Text>
+                          <Text>风险课程数：{studentDetail.alerts?.risk_count ?? "-"}</Text>
+                          <Text type="secondary">
+                            待处理课程：{(studentDetail.alerts?.pending_courses || []).map((i) => i.course_code).join("、") || "无"}
+                          </Text>
+                          <Text type="secondary">
+                            风险课程：{(studentDetail.alerts?.risk_courses || []).map((i) => i.course_code).join("、") || "无"}
+                          </Text>
+                        </Space>
+                      ),
+                    },
+                    {
+                      key: "progress",
+                      label: "学习进度",
+                      children: (
+                        <Space direction="vertical" style={{ width: "100%" }}>
+                          <Text>课程数：{studentDetail.progress?.course_count ?? "-"}</Text>
+                          <Text>已评分课程：{studentDetail.progress?.scored_course_count ?? "-"}</Text>
+                          <Text>待评分课程：{studentDetail.progress?.pending_course_count ?? "-"}</Text>
+                          <Text>总体均分：{studentDetail.progress?.overall_average ?? "-"}</Text>
+                        </Space>
+                      ),
+                    },
+                  ]}
+                />
+                {detailLoading && <Text type="secondary">详情加载中...</Text>}
+              </Space>
+            )}
+          </Drawer>
+
         </Space>
       </Content>
     </Layout>
