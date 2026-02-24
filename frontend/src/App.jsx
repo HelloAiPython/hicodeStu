@@ -63,6 +63,7 @@ export default function App() {
   const [keyword, setKeyword] = useState("");
   const [limit, setLimit] = useState(20);
   const [riskOnly, setRiskOnly] = useState(false);
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [boardLoading, setBoardLoading] = useState(false);
   const [boardData, setBoardData] = useState({
     count: 0,
@@ -195,7 +196,7 @@ export default function App() {
       return;
     }
     try {
-      const query = buildQuery({ threshold, q: keyword, risk_only: riskOnly ? 1 : 0 });
+      const query = buildQuery({ threshold, q: keyword, risk_only: riskOnly ? 1 : 0, pending_only: pendingOnly ? 1 : 0 });
       const response = await authFetch(`${API_BASE}/students/alerts_board_stats/?${query}`);
       if (!response.ok) {
         throw new Error(`统计加载失败（HTTP ${response.status}）`);
@@ -215,7 +216,7 @@ export default function App() {
 
     setBoardLoading(true);
     try {
-      const query = buildQuery({ threshold, q: keyword, limit, risk_only: riskOnly ? 1 : 0 });
+      const query = buildQuery({ threshold, q: keyword, limit, risk_only: riskOnly ? 1 : 0, pending_only: pendingOnly ? 1 : 0 });
       const response = await authFetch(`${API_BASE}/students/alerts_board/?${query}`);
 
       if (!response.ok) {
@@ -258,7 +259,7 @@ export default function App() {
       setRefreshToken(payload.refresh);
       messageApi.success("登录成功，已获取 access / refresh token");
 
-      const query = buildQuery({ threshold, q: keyword, limit, risk_only: riskOnly ? 1 : 0 });
+      const query = buildQuery({ threshold, q: keyword, limit, risk_only: riskOnly ? 1 : 0, pending_only: pendingOnly ? 1 : 0 });
       const boardResponse = await fetch(`${API_BASE}/students/alerts_board/?${query}`, {
         headers: {
           Authorization: `Bearer ${payload.access}`,
@@ -282,7 +283,7 @@ export default function App() {
       return;
     }
     try {
-      const query = buildQuery({ threshold, q: keyword, risk_only: riskOnly ? 1 : 0 });
+      const query = buildQuery({ threshold, q: keyword, risk_only: riskOnly ? 1 : 0, pending_only: pendingOnly ? 1 : 0 });
       const response = await authFetch(`${API_BASE}/students/alerts_board_export/?${query}`);
       if (!response.ok) {
         throw new Error(`导出失败（HTTP ${response.status}）`);
@@ -375,13 +376,19 @@ export default function App() {
                   addonBefore="限制"
                 />
               </Col>
-              <Col xs={24} md={3}>
+              <Col xs={24} md={2}>
                 <Space>
-                  <Switch checked={riskOnly} onChange={setRiskOnly} />
+                  <Switch checked={riskOnly} onChange={(v) => { setRiskOnly(v); if (v) setPendingOnly(false); }} />
                   <Text>仅风险</Text>
                 </Space>
               </Col>
-              <Col xs={24} md={3}>
+              <Col xs={24} md={2}>
+                <Space>
+                  <Switch checked={pendingOnly} onChange={(v) => { setPendingOnly(v); if (v) setRiskOnly(false); }} />
+                  <Text>仅待处理</Text>
+                </Space>
+              </Col>
+              <Col xs={24} md={4}>
                 <Space style={{ width: "100%" }}>
                   <Button type="primary" loading={boardLoading} onClick={fetchAlertsBoard}>
                     加载看板
@@ -419,7 +426,7 @@ export default function App() {
             </Row>
 
             <Paragraph style={{ marginTop: 12 }} type="secondary">
-              返回记录：{boardData.count} / 总命中：{boardData.total_count} / 当前阈值：{boardData.threshold}
+              返回记录：{boardData.count} / 总命中：{boardData.total_count} / 当前阈值：{boardData.threshold} / 过滤模式：{boardData.filter_mode || "all"}
             </Paragraph>
 
             <Table

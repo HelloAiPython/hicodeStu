@@ -282,7 +282,7 @@ class LeaderboardApiTests(BaseApiFixture):
         response = self.client.get("/api/students/alerts_board/?threshold=80&risk_only=1")
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data["risk_only"])
+        self.assertEqual(data["filter_mode"], "risk")
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["total_count"], 1)
         self.assertEqual(data["results"][0]["student_number"], "S002")
@@ -291,7 +291,7 @@ class LeaderboardApiTests(BaseApiFixture):
         response = self.client.get("/api/students/alerts_board_stats/?threshold=80&risk_only=1")
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data["risk_only"])
+        self.assertEqual(data["filter_mode"], "risk")
         self.assertEqual(data["alert_student_count"], 1)
         self.assertEqual(data["pending_total"], 0)
         self.assertEqual(data["risk_total"], 1)
@@ -302,6 +302,30 @@ class LeaderboardApiTests(BaseApiFixture):
         lines = response.content.decode("utf-8").strip().splitlines()
         self.assertEqual(len(lines), 2)
         self.assertTrue(lines[1].startswith("S002,"))
+
+    def test_student_alerts_board_pending_only(self):
+        response = self.client.get("/api/students/alerts_board/?threshold=80&pending_only=1")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["filter_mode"], "pending")
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["results"][0]["student_number"], "S003")
+
+    def test_student_alerts_board_stats_pending_only(self):
+        response = self.client.get("/api/students/alerts_board_stats/?threshold=80&pending_only=1")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["filter_mode"], "pending")
+        self.assertEqual(data["alert_student_count"], 1)
+        self.assertEqual(data["pending_total"], 1)
+        self.assertEqual(data["risk_total"], 0)
+
+    def test_student_alerts_board_export_pending_only(self):
+        response = self.client.get("/api/students/alerts_board_export/?threshold=80&pending_only=1")
+        self.assertEqual(response.status_code, 200)
+        lines = response.content.decode("utf-8").strip().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("S003,"))
 
     def test_student_alerts_board_export_csv(self):
         response = self.client.get("/api/students/alerts_board_export/?threshold=80")
