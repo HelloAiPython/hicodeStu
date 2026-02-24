@@ -57,8 +57,8 @@ npm run dev
 3. 打开前端页面：
    - 先在“教师登录（JWT）”输入账号密码获取 token（access/refresh token 会持久化到浏览器本地）
    - 再点击“加载看板”请求 `/api/students/alerts_board/`（支持回车触发，同时加载统计卡片）
-   - 可按关键字筛选，并可切换“仅风险/仅待处理”过滤后下载 CSV（`/api/students/alerts_board_export/`）
-   - 可点击“退出登录”清除本地会话；access 过期时会自动尝试 refresh token 续期
+   - 可按关键字筛选，并可切换“仅风险/仅待处理”过滤后下载 CSV（导出文件名自动包含过滤模式与阈值）
+   - 可点击“重置筛选”快速恢复默认条件；可点击“退出登录”清除本地会话；access 过期时会自动尝试 refresh token 续期
 
 ## 下一步建议
 - 建立评分维度、课程、学生、作业等数据模型

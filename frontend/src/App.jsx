@@ -35,7 +35,7 @@ function buildQuery(params) {
   return searchParams.toString();
 }
 
-function csvFilename() {
+function csvFilename({ threshold, mode, keyword }) {
   const now = new Date();
   const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
     now.getDate()
@@ -43,7 +43,8 @@ function csvFilename() {
     2,
     "0"
   )}${String(now.getSeconds()).padStart(2, "0")}`;
-  return `students_alerts_board_${stamp}.csv`;
+  const safeKeyword = (keyword || "all").replace(/[^a-zA-Z0-9一-龥_-]/g, "").slice(0, 20) || "all";
+  return `students_alerts_board_${mode}_t${threshold}_${safeKeyword}_${stamp}.csv`;
 }
 
 export default function App() {
@@ -114,6 +115,15 @@ export default function App() {
       risk_total: 0,
     });
     messageApi.info(notice);
+  };
+
+  const resetFilters = () => {
+    setThreshold(80);
+    setKeyword("");
+    setLimit(20);
+    setRiskOnly(false);
+    setPendingOnly(false);
+    messageApi.success("筛选条件已重置");
   };
 
   const tryRefreshAccessToken = async () => {
@@ -292,7 +302,8 @@ export default function App() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = csvFilename();
+      const exportMode = riskOnly ? "risk" : pendingOnly ? "pending" : "all";
+      anchor.download = csvFilename({ threshold, mode: exportMode, keyword });
       anchor.click();
       window.URL.revokeObjectURL(url);
       messageApi.success("CSV 导出成功");
@@ -394,6 +405,7 @@ export default function App() {
                     加载看板
                   </Button>
                   <Button onClick={handleExport}>导出 CSV</Button>
+                  <Button onClick={resetFilters}>重置筛选</Button>
                 </Space>
               </Col>
             </Row>
@@ -426,7 +438,7 @@ export default function App() {
             </Row>
 
             <Paragraph style={{ marginTop: 12 }} type="secondary">
-              返回记录：{boardData.count} / 总命中：{boardData.total_count} / 当前阈值：{boardData.threshold} / 过滤模式：{boardData.filter_mode || "all"}
+              返回记录：{boardData.count} / 总命中：{boardData.total_count} / 当前阈值：{boardData.threshold} / 过滤模式：{boardData.filter_mode === "risk" ? "仅风险" : boardData.filter_mode === "pending" ? "仅待处理" : "全部"}
             </Paragraph>
 
             <Table
