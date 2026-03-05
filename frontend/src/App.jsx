@@ -331,6 +331,40 @@ export default function App() {
     }
   };
 
+  const exportStudentDetailCsv = async (detailType) => {
+    if (!selectedStudent) {
+      return;
+    }
+    try {
+      const endpoint =
+        detailType === "alerts"
+          ? `${API_BASE}/students/${selectedStudent.student_id}/alerts_export/?threshold=${threshold}`
+          : `${API_BASE}/students/${selectedStudent.student_id}/progress_export/`;
+      const response = await authFetch(endpoint);
+      if (!response.ok) {
+        throw new Error("详情导出失败");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const suffix = detailType === "alerts" ? "alerts" : "progress";
+      const now = new Date();
+      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
+        now.getDate()
+      ).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(
+        2,
+        "0"
+      )}${String(now.getSeconds()).padStart(2, "0")}`;
+      anchor.href = url;
+      anchor.download = `${selectedStudent.student_number}_${suffix}_${stamp}.csv`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      messageApi.success("详情导出成功");
+    } catch (error) {
+      messageApi.error(error.message || "详情导出失败");
+    }
+  };
+
   const openStudentDetail = async (record) => {
     setSelectedStudent(record);
     setDetailLoading(true);
@@ -502,6 +536,10 @@ export default function App() {
               <Space direction="vertical" style={{ width: "100%" }}>
                 <Text strong>学号：{selectedStudent.student_number}</Text>
                 <Text>用户名：{selectedStudent.username}</Text>
+                <Space>
+                  <Button size="small" onClick={() => exportStudentDetailCsv("alerts")}>导出预警CSV</Button>
+                  <Button size="small" onClick={() => exportStudentDetailCsv("progress")}>导出进度CSV</Button>
+                </Space>
                 <Tabs
                   items={[
                     {
