@@ -464,6 +464,18 @@ class ReportAndProgressApiTests(BaseApiFixture):
         self.assertEqual(data["alerts"]["risk_count"], 1)
         self.assertEqual(data["progress"]["course_count"], 1)
 
+    def test_student_detail_dashboard_export_csv(self):
+        student_profile = self.students[1][0]
+        response = self.client.get(
+            f"/api/students/{student_profile.id}/detail_dashboard_export/?threshold=80"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response["Content-Type"])
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
+        lines = response.content.decode("utf-8").strip().splitlines()
+        self.assertGreaterEqual(len(lines), 8)
+        self.assertIn("student_number,S002", lines[0])
+
 
     def test_enrollment_history(self):
         enrollment = self.students[0][1]

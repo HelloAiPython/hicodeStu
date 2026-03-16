@@ -481,6 +481,43 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["get"], url_path="detail_dashboard_export")
+    def detail_dashboard_export(self, request, pk=None):
+        profile = self.get_object()
+        threshold = parse_optional_float(request.query_params.get("threshold"))
+        if threshold is None:
+            threshold = 60.0
+
+        alerts_payload = student_alerts_rows(profile, threshold)
+        progress_payload = student_progress(profile)
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = (
+            f'attachment; filename="{profile.student_number}_detail_dashboard.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow(["student_number", profile.student_number])
+        writer.writerow(["threshold", threshold])
+        writer.writerow([])
+
+        writer.writerow(["section", "metric", "value"])
+        writer.writerow(["alerts", "pending_count", alerts_payload["pending_count"]])
+        writer.writerow(["alerts", "risk_count", alerts_payload["risk_count"]])
+        writer.writerow(["progress", "course_count", progress_payload["course_count"]])
+        writer.writerow(["progress", "scored_course_count", progress_payload["scored_course_count"]])
+        writer.writerow(["progress", "pending_course_count", progress_payload["pending_course_count"]])
+        writer.writerow(["progress", "overall_average", progress_payload["overall_average"]])
+        writer.writerow([])
+
+        writer.writerow(["alerts_pending_courses", "course_code", "course_name"])
+        for item in alerts_payload["pending_courses"]:
+            writer.writerow(["pending", item["course_code"], item["course_name"]])
+        writer.writerow(["alerts_risk_courses", "course_code", "course_name", "total_score"])
+        for item in alerts_payload["risk_courses"]:
+            writer.writerow(["risk", item["course_code"], item["course_name"], item["total_score"]])
+
+        return response
+
     @action(detail=True, methods=["get"])
     def progress(self, request, pk=None):
         profile = self.get_object()

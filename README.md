@@ -58,7 +58,7 @@ npm run dev
    - 先在“教师登录（JWT）”输入账号密码获取 token（access/refresh token 会持久化到浏览器本地）
    - 再点击“加载看板”请求 `/api/students/alerts_board/`（支持回车触发，同时加载统计卡片）
    - 可按关键字筛选，并可切换“仅风险/仅待处理”过滤后下载 CSV（导出文件名自动包含过滤模式与阈值）
-   - 可点击“查看详情”打开学生侧边栏，查看该学生的预警详情与学习进度，并可直接导出该学生预警/进度 CSV
+   - 可点击“查看详情”打开学生侧边栏，查看该学生的预警详情与学习进度，并可直接导出该学生预警/进度/详情总览 CSV
    - 可点击“重置筛选”快速恢复默认条件；可点击“退出登录”清除本地会话；access 过期时会自动尝试 refresh token 续期
 
 ## 下一步建议
@@ -74,6 +74,7 @@ npm run dev
 - `GET /api/students/alerts_board_stats/?threshold=<分数>&q=<关键字>&risk_only=1&pending_only=1` 学生预警总览统计（预警学生数/待处理总数/风险总数，支持仅风险/仅待处理过滤）
 - `GET /api/students/{id}/progress/` 学生跨课程学习进度
 - `GET /api/students/{id}/detail_dashboard/?threshold=<分数>` 学生详情面板（预警+学习进度）
+- `GET /api/students/{id}/detail_dashboard_export/?threshold=<分数>` 导出学生详情总览 CSV（预警+学习进度）
 - `GET /api/students/{id}/alerts/?threshold=<分数>` 学生预警信息
 - `GET /api/students/{id}/alerts_export/?threshold=<分数>` 导出学生预警 CSV
 - `GET /api/students/{id}/progress_export/` 导出学生学习进度 CSV

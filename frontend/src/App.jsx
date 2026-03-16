@@ -339,7 +339,9 @@ export default function App() {
       const endpoint =
         detailType === "alerts"
           ? `${API_BASE}/students/${selectedStudent.student_id}/alerts_export/?threshold=${threshold}`
-          : `${API_BASE}/students/${selectedStudent.student_id}/progress_export/`;
+          : detailType === "progress"
+            ? `${API_BASE}/students/${selectedStudent.student_id}/progress_export/`
+            : `${API_BASE}/students/${selectedStudent.student_id}/detail_dashboard_export/?threshold=${threshold}`;
       const response = await authFetch(endpoint);
       if (!response.ok) {
         throw new Error("详情导出失败");
@@ -347,7 +349,8 @@ export default function App() {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      const suffix = detailType === "alerts" ? "alerts" : "progress";
+      const suffix =
+        detailType === "alerts" ? "alerts" : detailType === "progress" ? "progress" : "dashboard";
       const now = new Date();
       const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
         now.getDate()
@@ -539,6 +542,7 @@ export default function App() {
                 <Space>
                   <Button size="small" onClick={() => exportStudentDetailCsv("alerts")}>导出预警CSV</Button>
                   <Button size="small" onClick={() => exportStudentDetailCsv("progress")}>导出进度CSV</Button>
+                  <Button size="small" onClick={() => exportStudentDetailCsv("dashboard")}>导出详情总览CSV</Button>
                 </Space>
                 <Tabs
                   items={[
