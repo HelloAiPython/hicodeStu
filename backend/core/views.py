@@ -1379,3 +1379,27 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
                 ]
             )
         return response
+
+    @action(detail=False, methods=["get"], url_path="stats")
+    def stats(self, request):
+        queryset = self.get_queryset()
+        action_counts = {}
+        target_type_counts = {}
+        for item in queryset:
+            action_counts[item.action] = action_counts.get(item.action, 0) + 1
+            target_type_counts[item.target_type] = target_type_counts.get(item.target_type, 0) + 1
+
+        top_actions = sorted(action_counts.items(), key=lambda pair: pair[1], reverse=True)
+        top_targets = sorted(target_type_counts.items(), key=lambda pair: pair[1], reverse=True)
+        return Response(
+            {
+                "count": queryset.count(),
+                "action_breakdown": [
+                    {"action": action, "count": count} for action, count in top_actions
+                ],
+                "target_type_breakdown": [
+                    {"target_type": target_type, "count": count}
+                    for target_type, count in top_targets
+                ],
+            }
+        )

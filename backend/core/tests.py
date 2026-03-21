@@ -480,6 +480,35 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertIn("text/csv", response["Content-Type"])
         self.assertIn("attachment; filename=", response["Content-Disposition"])
 
+    def test_score_audit_log_stats(self):
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="one",
+        )
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="two",
+        )
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="normalize",
+            target_type="score_rule",
+            target_id=self.course.id,
+            detail="three",
+        )
+        response = self.client.get("/api/score-audit-logs/stats/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 3)
+        self.assertEqual(data["action_breakdown"][0]["action"], "manual_check")
+        self.assertEqual(data["action_breakdown"][0]["count"], 2)
+
     def test_course_action_board(self):
         response = self.client.get(f"/api/courses/{self.course.id}/action_board/?threshold=80&limit=5")
         self.assertEqual(response.status_code, 200)
@@ -637,4 +666,8 @@ class StudentPermissionTests(BaseApiFixture):
 
     def test_student_cannot_access_score_audit_logs(self):
         response = self.client.get("/api/score-audit-logs/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_student_cannot_access_score_audit_log_stats(self):
+        response = self.client.get("/api/score-audit-logs/stats/")
         self.assertEqual(response.status_code, 403)
