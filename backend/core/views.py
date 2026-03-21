@@ -1423,6 +1423,20 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get"], url_path="filter-options")
+    def filter_options(self, request):
+        queryset = ScoreAuditLog.objects.select_related("actor")
+        actions = sorted({item.action for item in queryset})
+        target_types = sorted({item.target_type for item in queryset})
+        actor_usernames = sorted({item.actor.username for item in queryset})
+        return Response(
+            {
+                "actions": actions,
+                "target_types": target_types,
+                "actor_usernames": actor_usernames,
+            }
+        )
+
     @action(detail=False, methods=["post"], url_path="purge")
     def purge(self, request):
         before_date_raw = (request.data.get("before_date") or "").strip()
