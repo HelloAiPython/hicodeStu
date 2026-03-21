@@ -1403,3 +1403,38 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
                 ],
             }
         )
+
+    @action(detail=False, methods=["post"], url_path="purge")
+    def purge(self, request):
+        before_date_raw = (request.data.get("before_date") or "").strip()
+        before_date = parse_date(before_date_raw)
+        if not before_date:
+            return Response({"detail": "请提供有效的 before_date（YYYY-MM-DD）。"}, status=400)
+
+        dry_run = parse_bool_flag(request.data.get("dry_run", 1))
+        queryset = ScoreAuditLog.objects.filter(created_at__date__lt=before_date)
+        to_delete_count = queryset.count()
+
+        if dry_run:
+            return Response(
+                {
+                    "before_date": before_date_raw,
+                    "dry_run": True,
+                    "would_delete_count": to_delete_count,
+                }
+            )
+
+        deleted_count, _ = queryset.delete()
+        log_score_audit(
+            request,
+            action="score_audit_purge",
+            target_type="score_audit_log",
+            detail=f"before_date={before_date_raw}, deleted_count={deleted_count}",
+        )
+        return Response(
+            {
+                "before_date": before_date_raw,
+                "dry_run": False,
+                "deleted_count": deleted_count,
+            }
+        )

@@ -509,6 +509,39 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["action_breakdown"][0]["action"], "manual_check")
         self.assertEqual(data["action_breakdown"][0]["count"], 2)
 
+    def test_score_audit_log_purge_dry_run_and_execute(self):
+        old_log = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="old",
+        )
+        ScoreAuditLog.objects.filter(id=old_log.id).update(created_at="2024-01-01T00:00:00Z")
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="new",
+        )
+
+        dry_run_response = self.client.post(
+            "/api/score-audit-logs/purge/",
+            {"before_date": "2025-01-01", "dry_run": 1},
+            format="json",
+        )
+        self.assertEqual(dry_run_response.status_code, 200)
+        self.assertEqual(dry_run_response.json()["would_delete_count"], 1)
+
+        execute_response = self.client.post(
+            "/api/score-audit-logs/purge/",
+            {"before_date": "2025-01-01", "dry_run": 0},
+            format="json",
+        )
+        self.assertEqual(execute_response.status_code, 200)
+        self.assertEqual(execute_response.json()["deleted_count"], 1)
+
     def test_course_action_board(self):
         response = self.client.get(f"/api/courses/{self.course.id}/action_board/?threshold=80&limit=5")
         self.assertEqual(response.status_code, 200)
@@ -670,4 +703,12 @@ class StudentPermissionTests(BaseApiFixture):
 
     def test_student_cannot_access_score_audit_log_stats(self):
         response = self.client.get("/api/score-audit-logs/stats/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_student_cannot_purge_score_audit_logs(self):
+        response = self.client.post(
+            "/api/score-audit-logs/purge/",
+            {"before_date": "2025-01-01", "dry_run": 1},
+            format="json",
+        )
         self.assertEqual(response.status_code, 403)
