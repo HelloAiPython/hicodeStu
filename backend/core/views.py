@@ -1345,14 +1345,33 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
     def list(self, request, *args, **kwargs):
-        limit = parse_positive_int(request.query_params.get("limit"), 50)
         queryset = self.get_queryset().order_by("-id")
-        page = queryset[:limit]
-        serializer = self.get_serializer(page, many=True)
+        limit_raw = request.query_params.get("limit")
+        if limit_raw is not None and str(limit_raw).strip() != "":
+            limit = parse_positive_int(limit_raw, 50)
+            page = queryset[:limit]
+            serializer = self.get_serializer(page, many=True)
+            return Response(
+                {
+                    "count": len(serializer.data),
+                    "limit": limit,
+                    "results": serializer.data,
+                }
+            )
+
+        page = parse_positive_int(request.query_params.get("page"), 1)
+        page_size = parse_positive_int(request.query_params.get("page_size"), 20)
+        total_count = queryset.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        rows = queryset[start:end]
+        serializer = self.get_serializer(rows, many=True)
         return Response(
             {
                 "count": len(serializer.data),
-                "limit": limit,
+                "total_count": total_count,
+                "page": page,
+                "page_size": page_size,
                 "results": serializer.data,
             }
         )

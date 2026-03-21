@@ -443,6 +443,29 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["limit"], 1)
         self.assertEqual(data["results"][0]["action"], "manual_check")
 
+    def test_score_audit_log_list_with_page_and_page_size(self):
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="a1",
+            target_type="course",
+            target_id=self.course.id,
+            detail="one",
+        )
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="a2",
+            target_type="course",
+            target_id=self.course.id,
+            detail="two",
+        )
+        response = self.client.get("/api/score-audit-logs/?page=2&page_size=1")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["page"], 2)
+        self.assertEqual(data["page_size"], 1)
+        self.assertEqual(data["total_count"], 2)
+        self.assertEqual(data["count"], 1)
+
     def test_score_audit_log_list_filter_by_target_and_date(self):
         today = timezone.now().date().isoformat()
         ScoreAuditLog.objects.create(
