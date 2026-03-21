@@ -1412,16 +1412,34 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": "请提供有效的 before_date（YYYY-MM-DD）。"}, status=400)
 
         dry_run = parse_bool_flag(request.data.get("dry_run", 1))
+        max_delete = parse_positive_int(request.data.get("max_delete"), 5000)
         queryset = ScoreAuditLog.objects.filter(created_at__date__lt=before_date)
         to_delete_count = queryset.count()
+        if to_delete_count > max_delete:
+            return Response(
+                {
+                    "detail": "待删除日志数超过 max_delete 限制，请缩小时间范围或提高 max_delete。",
+                    "before_date": before_date_raw,
+                    "max_delete": max_delete,
+                    "would_delete_count": to_delete_count,
+                },
+                status=400,
+            )
 
         if dry_run:
             return Response(
                 {
                     "before_date": before_date_raw,
                     "dry_run": True,
+                    "max_delete": max_delete,
                     "would_delete_count": to_delete_count,
                 }
+            )
+
+        if (request.data.get("confirm") or "").strip().upper() != "DELETE":
+            return Response(
+                {"detail": "执行删除请提供 confirm=DELETE。", "before_date": before_date_raw},
+                status=400,
             )
 
         deleted_count, _ = queryset.delete()
@@ -1435,6 +1453,7 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             {
                 "before_date": before_date_raw,
                 "dry_run": False,
+                "max_delete": max_delete,
                 "deleted_count": deleted_count,
             }
         )

@@ -528,19 +528,52 @@ class LeaderboardApiTests(BaseApiFixture):
 
         dry_run_response = self.client.post(
             "/api/score-audit-logs/purge/",
-            {"before_date": "2025-01-01", "dry_run": 1},
+            {"before_date": "2025-01-01", "dry_run": 1, "max_delete": 10},
             format="json",
         )
         self.assertEqual(dry_run_response.status_code, 200)
         self.assertEqual(dry_run_response.json()["would_delete_count"], 1)
 
+        missing_confirm_response = self.client.post(
+            "/api/score-audit-logs/purge/",
+            {"before_date": "2025-01-01", "dry_run": 0, "max_delete": 10},
+            format="json",
+        )
+        self.assertEqual(missing_confirm_response.status_code, 400)
+
         execute_response = self.client.post(
             "/api/score-audit-logs/purge/",
-            {"before_date": "2025-01-01", "dry_run": 0},
+            {"before_date": "2025-01-01", "dry_run": 0, "max_delete": 10, "confirm": "DELETE"},
             format="json",
         )
         self.assertEqual(execute_response.status_code, 200)
         self.assertEqual(execute_response.json()["deleted_count"], 1)
+
+    def test_score_audit_log_purge_max_delete_guard(self):
+        old_log = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="old",
+        )
+        old_log_2 = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="old-2",
+        )
+        ScoreAuditLog.objects.filter(id__in=[old_log.id, old_log_2.id]).update(
+            created_at="2024-01-01T00:00:00Z"
+        )
+        response = self.client.post(
+            "/api/score-audit-logs/purge/",
+            {"before_date": "2025-01-01", "dry_run": 1, "max_delete": 1},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["would_delete_count"], 2)
 
     def test_course_action_board(self):
         response = self.client.get(f"/api/courses/{self.course.id}/action_board/?threshold=80&limit=5")
