@@ -647,6 +647,38 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["would_delete_count"], 2)
 
+    def test_score_audit_log_purge_with_action_filter(self):
+        classroom_log = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="classroom_score_bulk_create",
+            target_type="classroom_score",
+            target_id=self.course.id,
+            detail="old-class",
+        )
+        homework_log = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="homework_score_bulk_create",
+            target_type="homework_score",
+            target_id=self.course.id,
+            detail="old-homework",
+        )
+        ScoreAuditLog.objects.filter(id__in=[classroom_log.id, homework_log.id]).update(
+            created_at="2024-01-01T00:00:00Z"
+        )
+        response = self.client.post(
+            "/api/score-audit-logs/purge/",
+            {
+                "before_date": "2025-01-01",
+                "dry_run": 0,
+                "max_delete": 10,
+                "confirm": "DELETE",
+                "action": "classroom_score_bulk_create",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["deleted_count"], 1)
+
     def test_course_action_board(self):
         response = self.client.get(f"/api/courses/{self.course.id}/action_board/?threshold=80&limit=5")
         self.assertEqual(response.status_code, 200)

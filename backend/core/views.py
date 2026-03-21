@@ -1451,7 +1451,17 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
         dry_run = parse_bool_flag(request.data.get("dry_run", 1))
         max_delete = parse_positive_int(request.data.get("max_delete"), 5000)
-        queryset = ScoreAuditLog.objects.filter(created_at__date__lt=before_date)
+        action_name = (request.data.get("action") or "").strip()
+        target_type = (request.data.get("target_type") or "").strip()
+        actor_username = (request.data.get("actor_username") or "").strip()
+
+        queryset = ScoreAuditLog.objects.select_related("actor").filter(created_at__date__lt=before_date)
+        if action_name:
+            queryset = queryset.filter(action=action_name)
+        if target_type:
+            queryset = queryset.filter(target_type=target_type)
+        if actor_username:
+            queryset = queryset.filter(actor__username__icontains=actor_username)
         to_delete_count = queryset.count()
         if to_delete_count > max_delete:
             return Response(
@@ -1470,6 +1480,11 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
                     "before_date": before_date_raw,
                     "dry_run": True,
                     "max_delete": max_delete,
+                    "filters": {
+                        "action": action_name or None,
+                        "target_type": target_type or None,
+                        "actor_username": actor_username or None,
+                    },
                     "would_delete_count": to_delete_count,
                 }
             )
@@ -1485,13 +1500,22 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             request,
             action="score_audit_purge",
             target_type="score_audit_log",
-            detail=f"before_date={before_date_raw}, deleted_count={deleted_count}",
+            detail=(
+                f"before_date={before_date_raw}, action={action_name or '*'}, "
+                f"target_type={target_type or '*'}, actor_username={actor_username or '*'}, "
+                f"deleted_count={deleted_count}"
+            ),
         )
         return Response(
             {
                 "before_date": before_date_raw,
                 "dry_run": False,
                 "max_delete": max_delete,
+                "filters": {
+                    "action": action_name or None,
+                    "target_type": target_type or None,
+                    "actor_username": actor_username or None,
+                },
                 "deleted_count": deleted_count,
             }
         )
