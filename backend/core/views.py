@@ -1319,3 +1319,53 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ScoreAuditLog.objects.select_related("actor")
     serializer_class = ScoreAuditLogSerializer
     permission_classes = [IsTeacher]
+
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related("actor")
+        action_name = (self.request.query_params.get("action") or "").strip()
+        target_type = (self.request.query_params.get("target_type") or "").strip()
+        actor_username = (self.request.query_params.get("actor_username") or "").strip()
+
+        if action_name:
+            queryset = queryset.filter(action=action_name)
+        if target_type:
+            queryset = queryset.filter(target_type=target_type)
+        if actor_username:
+            queryset = queryset.filter(actor__username__icontains=actor_username)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        limit = parse_positive_int(request.query_params.get("limit"), 50)
+        queryset = self.get_queryset().order_by("-id")
+        page = queryset[:limit]
+        serializer = self.get_serializer(page, many=True)
+        return Response(
+            {
+                "count": len(serializer.data),
+                "limit": limit,
+                "results": serializer.data,
+            }
+        )
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.get_queryset().order_by("-id")
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="score_audit_logs.csv"'
+        writer = csv.writer(response)
+        writer.writerow(
+            ["id", "actor_username", "action", "target_type", "target_id", "detail", "created_at"]
+        )
+        for item in queryset:
+            writer.writerow(
+                [
+                    item.id,
+                    item.actor.username,
+                    item.action,
+                    item.target_type,
+                    item.target_id or "",
+                    item.detail,
+                    item.created_at.isoformat(),
+                ]
+            )
+        return response

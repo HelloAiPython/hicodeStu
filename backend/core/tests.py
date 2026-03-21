@@ -417,8 +417,43 @@ class LeaderboardApiTests(BaseApiFixture):
         response = self.client.get("/api/score-audit-logs/")
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["action"], "manual_check")
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["results"][0]["action"], "manual_check")
+
+    def test_score_audit_log_list_filter_and_limit(self):
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="first",
+        )
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="normalize",
+            target_type="score_rule",
+            target_id=self.course.id,
+            detail="second",
+        )
+        response = self.client.get("/api/score-audit-logs/?action=manual_check&limit=1")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["limit"], 1)
+        self.assertEqual(data["results"][0]["action"], "manual_check")
+
+    def test_score_audit_log_export_csv(self):
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="smoke",
+        )
+        response = self.client.get("/api/score-audit-logs/export/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response["Content-Type"])
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
 
     def test_course_action_board(self):
         response = self.client.get(f"/api/courses/{self.course.id}/action_board/?threshold=80&limit=5")

@@ -112,7 +112,8 @@ npm run build
 - `POST /api/classroom-scores/bulk_create/` 批量录入课堂评分
 - `GET /api/homework-scores/` 作业评分
 - `POST /api/homework-scores/bulk_create/` 批量录入作业评分
-- `GET /api/score-audit-logs/` 评分操作审计日志（教师）
+- `GET /api/score-audit-logs/?action=<动作>&target_type=<对象类型>&actor_username=<用户名>&limit=<数量>` 评分操作审计日志（教师，支持过滤）
+- `GET /api/score-audit-logs/export/?action=<动作>&target_type=<对象类型>&actor_username=<用户名>` 导出评分操作审计日志 CSV（教师）
 
 
 ### 排名接口过滤参数（leaderboard）
