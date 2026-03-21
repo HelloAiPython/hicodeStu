@@ -50,6 +50,12 @@ npm install
 npm run dev
 ```
 
+### 前端打包校验
+
+```bash
+npm run build
+```
+
 ## 前后端联调（当前已可互通）
 
 1. 启动后端（默认 `127.0.0.1:8000`）。
@@ -117,4 +123,13 @@ npm run dev
 ```bash
 curl "http://127.0.0.1:8000/api/courses/1/leaderboard/?only_scored=1&min_score=80&limit=50&page=1&page_size=10" \
   -H "Authorization: Bearer <你的access_token>"
+```
+
+## 开发自检（建议）
+
+后端在提交前可先执行一次语法编译检查：
+
+```bash
+cd backend
+python -m compileall .
 ```
