@@ -2,6 +2,7 @@ import csv
 
 from django.db.models import Q
 from django.http import HttpResponse
+from django.utils.dateparse import parse_date
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -1325,6 +1326,9 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         action_name = (self.request.query_params.get("action") or "").strip()
         target_type = (self.request.query_params.get("target_type") or "").strip()
         actor_username = (self.request.query_params.get("actor_username") or "").strip()
+        target_id = (self.request.query_params.get("target_id") or "").strip()
+        date_from = parse_date((self.request.query_params.get("date_from") or "").strip())
+        date_to = parse_date((self.request.query_params.get("date_to") or "").strip())
 
         if action_name:
             queryset = queryset.filter(action=action_name)
@@ -1332,6 +1336,12 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(target_type=target_type)
         if actor_username:
             queryset = queryset.filter(actor__username__icontains=actor_username)
+        if target_id.isdigit():
+            queryset = queryset.filter(target_id=int(target_id))
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
         return queryset
 
     def list(self, request, *args, **kwargs):

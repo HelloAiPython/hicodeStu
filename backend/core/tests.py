@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from core.models import (
@@ -441,6 +442,30 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["limit"], 1)
         self.assertEqual(data["results"][0]["action"], "manual_check")
+
+    def test_score_audit_log_list_filter_by_target_and_date(self):
+        today = timezone.now().date().isoformat()
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="hit",
+        )
+        ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=999999,
+            detail="miss",
+        )
+        response = self.client.get(
+            f"/api/score-audit-logs/?target_id={self.course.id}&date_from={today}&date_to={today}"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["results"][0]["target_id"], self.course.id)
 
     def test_score_audit_log_export_csv(self):
         ScoreAuditLog.objects.create(
