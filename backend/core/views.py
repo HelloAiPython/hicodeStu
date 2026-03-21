@@ -1344,8 +1344,13 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(created_at__date__lte=date_to)
         return queryset
 
+    def resolve_ordering(self):
+        ordering = (self.request.query_params.get("ordering") or "-id").strip()
+        allowed = {"id", "-id", "created_at", "-created_at"}
+        return ordering if ordering in allowed else "-id"
+
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset().order_by("-id")
+        queryset = self.get_queryset().order_by(self.resolve_ordering())
         limit_raw = request.query_params.get("limit")
         if limit_raw is not None and str(limit_raw).strip() != "":
             limit = parse_positive_int(limit_raw, 50)
@@ -1378,7 +1383,7 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="export")
     def export(self, request):
-        queryset = self.get_queryset().order_by("-id")
+        queryset = self.get_queryset().order_by(self.resolve_ordering())
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = 'attachment; filename="score_audit_logs.csv"'
         writer = csv.writer(response)

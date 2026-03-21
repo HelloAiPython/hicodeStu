@@ -112,7 +112,7 @@ npm run build
 - `POST /api/classroom-scores/bulk_create/` 批量录入课堂评分
 - `GET /api/homework-scores/` 作业评分
 - `POST /api/homework-scores/bulk_create/` 批量录入作业评分
-- `GET /api/score-audit-logs/?action=<动作>&target_type=<对象类型>&target_id=<对象ID>&actor_username=<用户名>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>&limit=<数量>&page=<页码>&page_size=<每页条数>` 评分操作审计日志（教师，支持过滤/分页）
+- `GET /api/score-audit-logs/?action=<动作>&target_type=<对象类型>&target_id=<对象ID>&actor_username=<用户名>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>&limit=<数量>&page=<页码>&page_size=<每页条数>&ordering=<id|-id|created_at|-created_at>` 评分操作审计日志（教师，支持过滤/分页/排序）
 - `GET /api/score-audit-logs/export/?action=<动作>&target_type=<对象类型>&target_id=<对象ID>&actor_username=<用户名>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>` 导出评分操作审计日志 CSV（教师）
 - `GET /api/score-audit-logs/stats/?action=<动作>&target_type=<对象类型>&target_id=<对象ID>&actor_username=<用户名>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>` 评分操作审计统计（教师）
 - `GET /api/score-audit-logs/filter-options/` 获取审计日志筛选项（动作/对象类型/操作人，教师）

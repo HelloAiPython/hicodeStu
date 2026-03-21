@@ -466,6 +466,31 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertEqual(data["total_count"], 2)
         self.assertEqual(data["count"], 1)
 
+    def test_score_audit_log_ordering(self):
+        first = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="a1",
+            target_type="course",
+            target_id=self.course.id,
+            detail="one",
+        )
+        second = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="a2",
+            target_type="course",
+            target_id=self.course.id,
+            detail="two",
+        )
+        response_asc = self.client.get("/api/score-audit-logs/?ordering=id")
+        self.assertEqual(response_asc.status_code, 200)
+        asc_ids = [row["id"] for row in response_asc.json()["results"]]
+        self.assertEqual(asc_ids, [first.id, second.id])
+
+        response_desc = self.client.get("/api/score-audit-logs/?ordering=-id")
+        self.assertEqual(response_desc.status_code, 200)
+        desc_ids = [row["id"] for row in response_desc.json()["results"]]
+        self.assertEqual(desc_ids, [second.id, first.id])
+
     def test_score_audit_log_list_filter_by_target_and_date(self):
         today = timezone.now().date().isoformat()
         ScoreAuditLog.objects.create(
