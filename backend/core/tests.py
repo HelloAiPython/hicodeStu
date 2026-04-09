@@ -581,6 +581,28 @@ class LeaderboardApiTests(BaseApiFixture):
         self.assertIn("score_rule", data["target_types"])
         self.assertIn("teacher", data["actor_usernames"])
 
+    def test_score_audit_log_health(self):
+        first = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="manual_check",
+            target_type="course",
+            target_id=self.course.id,
+            detail="one",
+        )
+        second = ScoreAuditLog.objects.create(
+            actor=self.teacher,
+            action="normalize",
+            target_type="score_rule",
+            target_id=self.course.id,
+            detail="two",
+        )
+        response = self.client.get("/api/score-audit-logs/health/")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["total_count"], 2)
+        self.assertEqual(data["oldest_id"], first.id)
+        self.assertEqual(data["latest_id"], second.id)
+
     def test_score_audit_log_purge_dry_run_and_execute(self):
         old_log = ScoreAuditLog.objects.create(
             actor=self.teacher,
@@ -852,4 +874,8 @@ class StudentPermissionTests(BaseApiFixture):
 
     def test_student_cannot_access_score_audit_filter_options(self):
         response = self.client.get("/api/score-audit-logs/filter-options/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_student_cannot_access_score_audit_health(self):
+        response = self.client.get("/api/score-audit-logs/health/")
         self.assertEqual(response.status_code, 403)

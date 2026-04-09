@@ -116,6 +116,7 @@ npm run build
 - `GET /api/score-audit-logs/export/?action=<动作>&target_type=<对象类型>&target_id=<对象ID>&actor_username=<用户名>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>` 导出评分操作审计日志 CSV（教师）
 - `GET /api/score-audit-logs/stats/?action=<动作>&target_type=<对象类型>&target_id=<对象ID>&actor_username=<用户名>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>` 评分操作审计统计（教师）
 - `GET /api/score-audit-logs/filter-options/` 获取审计日志筛选项（动作/对象类型/操作人，教师）
+- `GET /api/score-audit-logs/health/` 审计日志健康概览（总数、最早/最新记录，教师）
 - `POST /api/score-audit-logs/purge/` 清理指定日期之前审计日志（教师，参数：`before_date`、`dry_run`、`max_delete`、`confirm=DELETE`，可选筛选：`action`、`target_type`、`actor_username`）
 
 

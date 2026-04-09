@@ -1442,6 +1442,22 @@ class ScoreAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get"], url_path="health")
+    def health(self, request):
+        queryset = ScoreAuditLog.objects.all().order_by("id")
+        total_count = queryset.count()
+        oldest = queryset.first()
+        latest = queryset.last()
+        return Response(
+            {
+                "total_count": total_count,
+                "oldest_id": oldest.id if oldest else None,
+                "oldest_created_at": oldest.created_at.isoformat() if oldest else None,
+                "latest_id": latest.id if latest else None,
+                "latest_created_at": latest.created_at.isoformat() if latest else None,
+            }
+        )
+
     @action(detail=False, methods=["post"], url_path="purge")
     def purge(self, request):
         before_date_raw = (request.data.get("before_date") or "").strip()
