@@ -119,6 +119,8 @@ npm run build
 - `GET /api/score-audit-logs/health/` 审计日志健康概览（总数、最早/最新记录，教师）
 - `POST /api/score-audit-logs/purge/` 清理指定日期之前审计日志（教师，参数：`before_date`、`dry_run`、`max_delete`、`confirm=DELETE`，可选筛选：`action`、`target_type`、`actor_username`）
 
+> 审计日志已为常用查询维度（时间、动作、对象、操作人）建立索引，适合教师端按条件分页检索与导出。
+
 
 ### 排名接口过滤参数（leaderboard）
 - `only_scored=1`：只返回已有总分学生

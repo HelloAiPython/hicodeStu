@@ -75,3 +75,9 @@ class ScoreAuditLog(models.Model):
 
     class Meta:
         ordering = ("-id",)
+        indexes = [
+            models.Index(fields=["created_at"], name="score_audit_created_idx"),
+            models.Index(fields=["action", "created_at"], name="score_audit_action_idx"),
+            models.Index(fields=["target_type", "target_id"], name="score_audit_target_idx"),
+            models.Index(fields=["actor", "created_at"], name="score_audit_actor_idx"),
+        ]
