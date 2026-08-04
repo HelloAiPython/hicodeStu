@@ -33,3 +33,21 @@ This container currently cannot install Python packages from PyPI, regardless of
 1. A reachable internal PyPI mirror configured via `PIP_INDEX_URL`.
 2. Prebuilt wheel files mounted into the workspace for offline installation.
 3. Fix access policy for `http://proxy:8080` to allow pip tunneling to PyPI.
+
+## 2026-08-04 retry
+
+- `python -m venv .venv`
+  - Succeeded with Python `3.14.4` and pip `26.0.1`.
+
+- `. .venv/bin/activate && pip install -r backend/requirements.txt`
+  - Failed with `ProxyError: Tunnel connection failed: 403 Forbidden` while resolving `/simple/django/` through the configured proxy.
+
+- `. .venv/bin/activate && pip install -r backend/requirements.txt -i http://pypi.hub.ace-research.openai.org/simple --trusted-host pypi.hub.ace-research.openai.org`
+  - Failed with `No matching distribution found for django<6.0,>=5.0` from the alternate index.
+
+- `unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy; . .venv/bin/activate && pip install -r backend/requirements.txt`
+  - Failed with `Temporary failure in name resolution` while resolving PyPI directly after bypassing the proxy.
+
+## 2026-08-04 conclusion
+
+A local virtual environment can be created, but this container still cannot install Django dependencies because all tested package-resolution paths are blocked or unavailable: the default proxy rejects PyPI tunneling, the alternate index does not provide the required Django package, and direct PyPI resolution fails without the proxy.
