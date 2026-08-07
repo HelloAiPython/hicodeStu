@@ -1,6 +1,18 @@
 import csv
 
-from django.db.models import Q
+from django.db.models import (
+    Case,
+    Exists,
+    ExpressionWrapper,
+    F,
+    FloatField,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import Cast, Coalesce, Round
 from django.http import HttpResponse
 from django.utils.dateparse import parse_date
 from rest_framework import permissions, viewsets
@@ -28,21 +40,109 @@ from .serializers import (
 )
 
 
-def average_score(score, fields):
-    if not score:
-        return None
-    values = [getattr(score, field) for field in fields]
-    return round(sum(values) / len(values), 2)
+def round_optional(value):
+    return round(float(value), 2) if value is not None else None
 
 
-def resolve_weights(course):
-    rule_map = {
-        rule.name.lower(): float(rule.weight)
-        for rule in ScoreRule.objects.filter(course=course, is_active=True)
+def annotated_enrollments(queryset):
+    latest_classroom = ClassroomScore.objects.filter(enrollment=OuterRef("pk")).order_by(
+        "-recorded_at", "-id"
+    )
+    latest_homework = HomeworkScore.objects.filter(enrollment=OuterRef("pk")).order_by(
+        "-recorded_at", "-id"
+    )
+    classroom_weight = ScoreRule.objects.filter(
+        course=OuterRef("course_id"), name__iexact="classroom", is_active=True
+    ).values("weight")[:1]
+    homework_weight = ScoreRule.objects.filter(
+        course=OuterRef("course_id"), name__iexact="homework", is_active=True
+    ).values("weight")[:1]
+
+    classroom_avg = latest_classroom.annotate(
+        score_avg=Round(
+            ExpressionWrapper(
+                (F("attentive") + F("participation") + F("exercise_completion"))
+                / Value(3.0),
+                output_field=FloatField(),
+            ),
+            2,
+        )
+    ).values("score_avg")[:1]
+    homework_avg = latest_homework.annotate(
+        score_avg=Round(
+            ExpressionWrapper(
+                (F("completion") + F("accuracy") + F("correction")) / Value(3.0),
+                output_field=FloatField(),
+            ),
+            2,
+        )
+    ).values("score_avg")[:1]
+
+    annotated = queryset.annotate(
+        classroom_score=Subquery(classroom_avg, output_field=FloatField()),
+        homework_score=Subquery(homework_avg, output_field=FloatField()),
+        has_classroom=Exists(latest_classroom),
+        has_homework=Exists(latest_homework),
+        classroom_weight=Coalesce(
+            Cast(Subquery(classroom_weight), FloatField()),
+            Value(50.0),
+            output_field=FloatField(),
+        ),
+        homework_weight=Coalesce(
+            Cast(Subquery(homework_weight), FloatField()),
+            Value(50.0),
+            output_field=FloatField(),
+        ),
+    )
+    annotated = annotated.annotate(
+        weight_total=ExpressionWrapper(
+            F("classroom_weight") + F("homework_weight"), output_field=FloatField()
+        )
+    )
+    return annotated.annotate(
+        total_score=Case(
+            When(
+                classroom_score__isnull=False,
+                homework_score__isnull=False,
+                weight_total__gt=0,
+                then=Round(
+                    ExpressionWrapper(
+                        (
+                            F("classroom_score") * F("classroom_weight")
+                            + F("homework_score") * F("homework_weight")
+                        )
+                        / F("weight_total"),
+                        output_field=FloatField(),
+                    ),
+                    2,
+                ),
+            ),
+            default=Value(None),
+            output_field=FloatField(),
+        ),
+    )
+
+
+def enrollment_summary_from_annotation(enrollment):
+    return {
+        "enrollment_id": enrollment.id,
+        "student_id": enrollment.student_id,
+        "student_number": enrollment.student.student_number,
+        "classroom_score": round_optional(enrollment.classroom_score),
+        "homework_score": round_optional(enrollment.homework_score),
+        "classroom_weight": round_optional(enrollment.classroom_weight),
+        "homework_weight": round_optional(enrollment.homework_weight),
+        "total_score": round_optional(enrollment.total_score),
+        "has_classroom": enrollment.has_classroom,
+        "has_homework": enrollment.has_homework,
     }
-    classroom_weight = rule_map.get("classroom", 50.0)
-    homework_weight = rule_map.get("homework", 50.0)
-    return classroom_weight, homework_weight
+
+
+def enrollment_summary_rows(queryset):
+    return [
+        enrollment_summary_from_annotation(enrollment)
+        for enrollment in annotated_enrollments(queryset)
+    ]
 
 
 def score_band(value):
@@ -58,45 +158,9 @@ def score_band(value):
 
 
 def enrollment_summary(enrollment):
-    classroom_latest = (
-        ClassroomScore.objects.filter(enrollment=enrollment)
-        .order_by("-recorded_at", "-id")
-        .first()
-    )
-    homework_latest = (
-        HomeworkScore.objects.filter(enrollment=enrollment)
-        .order_by("-recorded_at", "-id")
-        .first()
-    )
-
-    classroom_score = average_score(
-        classroom_latest, ["attentive", "participation", "exercise_completion"]
-    )
-    homework_score = average_score(homework_latest, ["completion", "accuracy", "correction"])
-
-    classroom_weight, homework_weight = resolve_weights(enrollment.course)
-    weight_total = classroom_weight + homework_weight
-
-    total_score = None
-    if classroom_score is not None and homework_score is not None and weight_total > 0:
-        total_score = round(
-            (classroom_score * classroom_weight + homework_score * homework_weight)
-            / weight_total,
-            2,
-        )
-
-    return {
-        "enrollment_id": enrollment.id,
-        "student_id": enrollment.student_id,
-        "student_number": enrollment.student.student_number,
-        "classroom_score": classroom_score,
-        "homework_score": homework_score,
-        "classroom_weight": classroom_weight,
-        "homework_weight": homework_weight,
-        "total_score": total_score,
-        "has_classroom": classroom_latest is not None,
-        "has_homework": homework_latest is not None,
-    }
+    queryset = Enrollment.objects.select_related("student", "course").filter(pk=enrollment.pk)
+    annotated = annotated_enrollments(queryset).get()
+    return enrollment_summary_from_annotation(annotated)
 
 
 def student_progress(profile):
@@ -104,8 +168,8 @@ def student_progress(profile):
     details = []
     scores = []
 
-    for enrollment in enrollments:
-        summary = enrollment_summary(enrollment)
+    for enrollment in annotated_enrollments(enrollments):
+        summary = enrollment_summary_from_annotation(enrollment)
         details.append(
             {
                 "course_id": enrollment.course_id,
@@ -137,7 +201,8 @@ def student_progress(profile):
 
 def student_alerts_rows(profile, threshold):
     enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
-    rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+    enrollments = list(annotated_enrollments(enrollments))
+    rows = [enrollment_summary_from_annotation(enrollment) for enrollment in enrollments]
 
     pending_courses = [
         {
@@ -479,7 +544,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
             threshold = 60.0
 
         enrollments = Enrollment.objects.select_related("course", "student").filter(student=profile)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
 
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = (
@@ -644,7 +709,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         rows = []
         for course in queryset.order_by("id"):
             enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-            summary_rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+            summary_rows = enrollment_summary_rows(enrollments)
             pending_count = sum(
                 1
                 for row in summary_rows
@@ -707,7 +772,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         for course in queryset.order_by("id"):
             enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-            rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+            rows = enrollment_summary_rows(enrollments)
             pending_count = sum(
                 1
                 for row in rows
@@ -754,7 +819,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         results = []
         for course in courses:
             enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-            rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+            rows = enrollment_summary_rows(enrollments)
             scored = [row["total_score"] for row in rows if row["total_score"] is not None]
             avg = round(sum(scored) / len(scored), 2) if scored else None
             results.append(
@@ -805,7 +870,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def overview(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        summaries = [enrollment_summary(enrollment) for enrollment in enrollments]
+        summaries = enrollment_summary_rows(enrollments)
 
         with_total = [item["total_score"] for item in summaries if item["total_score"] is not None]
         course_average = round(sum(with_total) / len(with_total), 2) if with_total else None
@@ -826,7 +891,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def report(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
 
         distribution = {
             "excellent": 0,
@@ -858,7 +923,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def action_board(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
 
         threshold = parse_optional_float(request.query_params.get("threshold"))
         if threshold is None:
@@ -894,7 +959,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def risk_list(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
 
         threshold = parse_optional_float(request.query_params.get("threshold"))
         if threshold is None:
@@ -930,7 +995,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def pending_list(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
 
         pending_rows = [
             row
@@ -961,7 +1026,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def report_export(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
         rows.sort(
             key=lambda item: item["total_score"] if item["total_score"] is not None else -1,
             reverse=True,
@@ -999,7 +1064,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def leaderboard_export(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
         rows.sort(
             key=lambda item: item["total_score"] if item["total_score"] is not None else -1,
             reverse=True,
@@ -1030,7 +1095,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     def leaderboard(self, request, pk=None):
         course = self.get_object()
         enrollments = Enrollment.objects.select_related("student", "course").filter(course=course)
-        rows = [enrollment_summary(enrollment) for enrollment in enrollments]
+        rows = enrollment_summary_rows(enrollments)
 
         only_scored = request.query_params.get("only_scored") == "1"
         student_number = request.query_params.get("student_number")
